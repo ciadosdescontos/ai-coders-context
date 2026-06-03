@@ -19,7 +19,7 @@ import {
   getBasename,
   displayOperationSummary,
   getRulesExportPresets,
-} from '../shared';
+} from '../../../../shared';
 
 export type ExportRulesServiceDependencies = BaseDependencies;
 

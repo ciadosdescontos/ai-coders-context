@@ -8,9 +8,9 @@
 import * as path from 'path';
 import * as fs from 'fs-extra';
 
-import { colors, symbols, typography } from '../../utils/theme';
-import type { CLIInterface } from '../../utils/cliUI';
-import type { TranslateFn } from '../../utils/i18n';
+import { colors, symbols, typography } from '../../../../utils/theme';
+import type { CLIInterface } from '../../../../utils/cliUI';
+import type { TranslateFn } from '../../../../utils/i18n';
 import type {
   ImportSkillsCommandFlags,
   ImportSkillsOptions,
@@ -21,7 +21,7 @@ import type {
   ImportAction,
 } from './types';
 import { SkillsDetector } from './skillsDetector';
-import { VERSION } from '../../version';
+import { VERSION } from '../../../../version';
 
 export interface ImportSkillsResult {
   targetPath: string;

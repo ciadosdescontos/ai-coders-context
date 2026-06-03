@@ -6,7 +6,7 @@
  */
 
 import type { RuleSource } from './types';
-import { getRulesImportSources, getAgentsImportSources } from '../shared';
+import { getRulesImportSources, getAgentsImportSources } from '../../../../shared';
 
 /**
  * Build rule sources from the unified tool registry

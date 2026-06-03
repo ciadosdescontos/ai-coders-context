@@ -8,9 +8,9 @@
 import * as path from 'path';
 import * as fs from 'fs-extra';
 
-import { colors, symbols, typography } from '../../utils/theme';
-import type { CLIInterface } from '../../utils/cliUI';
-import type { TranslateFn } from '../../utils/i18n';
+import { colors, symbols, typography } from '../../../../utils/theme';
+import type { CLIInterface } from '../../../../utils/cliUI';
+import type { TranslateFn } from '../../../../utils/i18n';
 import type {
   ReverseSyncServiceDependencies,
   ReverseSyncOptions,
@@ -27,7 +27,7 @@ import { ImportSkillsService } from './importSkillsService';
 import { ImportRulesService } from '../import/importRulesService';
 import { ImportAgentsService } from '../import/importAgentsService';
 import { getToolIdFromPath } from './presets';
-import { VERSION } from '../../version';
+import { VERSION } from '../../../../version';
 
 export class ReverseQuickSyncService {
   private readonly ui: CLIInterface;

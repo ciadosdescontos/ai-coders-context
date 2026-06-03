@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { TargetPreset, PresetName } from './types';
-import { getAgentsSyncPresets } from '../shared';
+import { getAgentsSyncPresets } from '../../../../shared';
 
 /**
  * Build agent sync presets from the unified tool registry

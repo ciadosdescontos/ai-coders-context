@@ -7,12 +7,12 @@
 
 import * as path from 'path';
 import * as fs from 'fs-extra';
-import type { CLIInterface } from '../../utils/cliUI';
-import type { TranslateFn } from '../../utils/i18n';
+import type { CLIInterface } from '../../../../utils/cliUI';
+import type { TranslateFn } from '../../../../utils/i18n';
 import { SyncService } from '../sync';
 import { SkillExportService, ExportRulesService } from '../export';
-import { StateDetector } from '../state';
-import { createSkillRegistry } from '../../workflow/skills';
+import { StateDetector } from '../../../../cli/services/state';
+import { createSkillRegistry } from '../../../domain/workflow/skills';
 
 export interface QuickSyncServiceDependencies {
   ui: CLIInterface;

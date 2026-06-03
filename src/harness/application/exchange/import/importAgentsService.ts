@@ -1,9 +1,9 @@
 import * as path from 'path';
 import * as fs from 'fs-extra';
 
-import { colors, symbols, typography } from '../../utils/theme';
-import type { CLIInterface } from '../../utils/cliUI';
-import type { TranslateFn } from '../../utils/i18n';
+import { colors, symbols, typography } from '../../../../utils/theme';
+import type { CLIInterface } from '../../../../utils/cliUI';
+import type { TranslateFn } from '../../../../utils/i18n';
 import type {
   ImportAgentsCommandFlags,
   ImportServiceDependencies,

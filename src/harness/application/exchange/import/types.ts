@@ -1,5 +1,5 @@
-import type { CLIInterface } from '../../utils/cliUI';
-import type { TranslateFn } from '../../utils/i18n';
+import type { CLIInterface } from '../../../../utils/cliUI';
+import type { TranslateFn } from '../../../../utils/i18n';
 
 export type RuleType = 
   | 'cursorrules' 

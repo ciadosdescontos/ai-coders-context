@@ -16,7 +16,7 @@ import {
   getToolDisplayName as registryGetToolDisplayName,
   getToolCapabilities as registryGetToolCapabilities,
   ToolCapabilities,
-} from '../shared';
+} from '../../../../shared';
 
 // ============================================================================
 // Skill Sources (derived from tool registry)

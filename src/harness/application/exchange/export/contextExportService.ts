@@ -10,7 +10,7 @@ import {
   BaseDependencies,
   OperationResult,
   createEmptyResult,
-} from '../shared';
+} from '../../../../shared';
 import { ExportRulesService } from './exportRulesService';
 import { SkillExportService } from './skillExportService';
 import { SyncService } from '../sync';

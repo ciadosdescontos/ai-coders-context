@@ -5,8 +5,8 @@
  * which imports from AI tool directories into .context/
  */
 
-import type { CLIInterface } from '../../utils/cliUI';
-import type { TranslateFn } from '../../utils/i18n';
+import type { CLIInterface } from '../../../../utils/cliUI';
+import type { TranslateFn } from '../../../../utils/i18n';
 import type { ImportFormat, RuleFileInfo } from '../import/types';
 
 // ============================================================================

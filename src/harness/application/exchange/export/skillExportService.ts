@@ -15,8 +15,8 @@ import {
   pathExists,
   displayOperationSummary,
   getSkillsExportPresets,
-} from '../shared';
-import { createSkillRegistry, Skill, BUILT_IN_SKILLS, getBuiltInSkillTemplates, SKILL_TO_PHASES, wrapWithPortableFrontmatter } from '../../workflow/skills';
+} from '../../../../shared';
+import { createSkillRegistry, Skill, BUILT_IN_SKILLS, getBuiltInSkillTemplates, SKILL_TO_PHASES, wrapWithPortableFrontmatter } from '../../../domain/workflow/skills';
 
 export type SkillExportServiceDependencies = BaseDependencies;
 
