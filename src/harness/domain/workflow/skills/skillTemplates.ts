@@ -4,15 +4,14 @@
  * Separated from SkillRegistry to follow Single Responsibility Principle.
  * Each template contains description and markdown content for a built-in skill.
  *
- * Content is derived from the canonical skill definitions in
- * src/generators/shared/structures/skills/definitions.ts to maintain
- * a single source of truth.
+ * Content is derived from the canonical skill definitions in the harness
+ * scaffolding layer to maintain a single source of truth.
  */
 
 import { BuiltInSkillType } from './types';
 import {
   SkillDefaultContent,
-} from '../../generators/shared/structures/skills/factory';
+} from '../../../application/context/scaffolding/generators/shared/structures/skills/factory';
 import {
   commitMessageContent,
   prReviewContent,
@@ -24,7 +23,7 @@ import {
   featureBreakdownContent,
   apiDesignContent,
   securityAuditContent,
-} from '../../generators/shared/structures/skills/definitions';
+} from '../../../application/context/scaffolding/generators/shared/structures/skills/definitions';
 
 export interface SkillTemplate {
   description: string;

@@ -4,7 +4,7 @@ import * as fs from 'fs-extra';
 import type {
   CollaborationSessionRecord,
   CollaborationSessionStore,
-} from '../../workflow/collaboration';
+} from '../../domain/workflow/collaboration';
 
 export const CURRENT_COLLABORATION_DOCUMENT_VERSION = 2;
 

@@ -6,13 +6,13 @@
 
 import * as path from 'path';
 import * as fs from 'fs-extra';
-import { CollaborationSession, CollaborationManager } from '../../workflow/collaboration';
-import { GateCheckResult, ExecutionEvidence } from '../../workflow/gates';
-import { PHASE_NAMES_EN, PHASE_NAMES_PT } from '../../workflow/phases';
-import { createPlanLinker, type LinkedPlan } from '../../workflow/plans';
-import { ROLE_DISPLAY_NAMES } from '../../workflow/roles';
-import { getScaleName, getScaleFromName } from '../../workflow/scaling';
-import { PrevcOrchestrator, type WorkflowSummary } from '../../workflow/orchestrator';
+import { CollaborationSession, CollaborationManager } from '../../domain/workflow/collaboration';
+import { GateCheckResult, ExecutionEvidence } from '../../domain/workflow/gates';
+import { PHASE_NAMES_EN, PHASE_NAMES_PT } from '../../domain/workflow/phases';
+import { createPlanLinker, type LinkedPlan } from '../../domain/workflow/plans';
+import { ROLE_DISPLAY_NAMES } from '../../domain/workflow/roles';
+import { getScaleName, getScaleFromName } from '../../domain/workflow/scaling';
+import { PrevcOrchestrator, type WorkflowSummary } from '../../domain/workflow/orchestrator';
 import {
   PrevcStatus,
   PrevcPhase,
@@ -22,9 +22,9 @@ import {
   WorkflowSettings,
   PlanApproval,
   PhaseOrchestration,
-} from '../../workflow/types';
-import type { CollaborationSynthesis } from '../../workflow/types';
-import type { PlanLinker } from '../../workflow/plans';
+} from '../../domain/workflow/types';
+import type { CollaborationSynthesis } from '../../domain/workflow/types';
+import type { PlanLinker } from '../../domain/workflow/plans';
 import { FileCollaborationStore } from './fileCollaborationStore';
 import { DerivedPlanTaskContractBuilder } from './derivedPlanTaskContractBuilder';
 import {
@@ -32,7 +32,7 @@ import {
   type HarnessTaskContract,
   type HarnessSensorDefinition,
   type WorkflowHarnessBinding,
-} from '../harness';
+} from '..';
 import { HarnessSessionFacade, type WorkflowHarnessStatus } from './harnessSessionFacade';
 
 export type { WorkflowHarnessStatus };
@@ -175,7 +175,7 @@ export class WorkflowService {
         description: options.description || options.name,
         files: options.files,
       };
-      const { detectProjectScale } = await import('../../workflow');
+      const { detectProjectScale } = await import('../../domain/workflow');
       scale = detectProjectScale(context);
     }
 
@@ -746,7 +746,7 @@ export class WorkflowService {
     expectedOutputs?: string[];
     acceptanceCriteria?: string[];
     requiredSensors?: string[];
-    requiredArtifacts?: import('../harness').RequiredArtifactInput[];
+    requiredArtifacts?: import('..').RequiredArtifactInput[];
     metadata?: Record<string, unknown>;
   }): Promise<HarnessTaskContract> {
     const binding = await this.requireHarnessBinding();

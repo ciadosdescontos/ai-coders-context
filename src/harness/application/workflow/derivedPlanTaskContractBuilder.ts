@@ -1,7 +1,7 @@
-import { getPhaseDefinition } from '../../workflow/phases';
-import type { LinkedPlan, PlanPhase, PlanStep } from '../../workflow/plans';
-import type { PrevcPhase } from '../../workflow/types';
-import type { HarnessTaskContract, RequiredArtifactInput } from '../harness';
+import { getPhaseDefinition } from '../../domain/workflow/phases';
+import type { LinkedPlan, PlanPhase, PlanStep } from '../../domain/workflow/plans';
+import type { PrevcPhase } from '../../domain/workflow/types';
+import type { HarnessTaskContract, RequiredArtifactInput } from '..';
 
 /**
  * Conservative defaults for `requiredSensors` when a plan phase does not

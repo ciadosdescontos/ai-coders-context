@@ -11,7 +11,7 @@ import {
   PrevcPhase,
   PrevcStatus,
   getOutputsForPhase,
-} from '../../workflow';
+} from '../../domain/workflow';
 
 export interface AutoAdvanceResult {
   shouldAdvance: boolean;

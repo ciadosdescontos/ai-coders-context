@@ -23,7 +23,7 @@ import { PlanLinker } from './plans/planLinker';
 import { assertPhaseStatusConverges } from './plans/invariants';
 import { WorkflowGuidanceService } from './orchestration/workflowGuidanceService';
 import { buildNextAgentSuggestion } from './guidance';
-import type { HarnessWorkflowStateService } from '../services/harness/workflowStateService';
+import type { HarnessWorkflowStateService } from '../../adapters/out/workflowState/workflowStateService';
 import { WorkflowSyncError } from './errors';
 
 /**

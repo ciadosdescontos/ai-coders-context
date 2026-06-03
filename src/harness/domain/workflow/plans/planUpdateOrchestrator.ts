@@ -12,7 +12,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 
-import { GitService } from '../../utils/gitService';
+import { GitService } from '../../../../utils/gitService';
 import { PrevcStatusManager } from '../status/statusManager';
 import { StatusType } from '../types';
 import { PlanExecutionResolver } from './planExecutionResolver';

@@ -1,4 +1,4 @@
-import { parseScaffoldFrontMatter } from '../../utils/frontMatter';
+import { parseScaffoldFrontMatter } from '../../../../utils/frontMatter';
 import { PrevcPhase } from '../types';
 import {
   PLAN_PHASE_TO_PREVC,
@@ -419,10 +419,10 @@ export class PlanLinkerParser {
   }
 
   private uniqueArtifactSpecs(
-    values: import('../../services/harness').RequiredArtifactInput[]
-  ): import('../../services/harness').RequiredArtifactInput[] {
+    values: import('../../../application').RequiredArtifactInput[]
+  ): import('../../../application').RequiredArtifactInput[] {
     const seen = new Set<string>();
-    const out: import('../../services/harness').RequiredArtifactInput[] = [];
+    const out: import('../../../application').RequiredArtifactInput[] = [];
     for (const v of values) {
       if (v === null || v === undefined) continue;
       const key = typeof v === 'string' ? `s:${v.trim()}` : `o:${JSON.stringify(v)}`;

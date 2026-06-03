@@ -28,7 +28,7 @@ import type {
 import { PREVC_PHASE_ORDER, getPhaseDefinition } from '../phases';
 import { getRoleConfig } from '../prevcConfig';
 import { createInitialStatus } from './templates';
-import type { HarnessWorkflowStateService } from '../../services/harness/workflowStateService';
+import type { HarnessWorkflowStateService } from '../../../adapters/out/workflowState/workflowStateService';
 import {
   addHistoryEntry as addHistoryEntryOnStatus,
   addStepHistoryEntry as addStepHistoryEntryOnStatus,

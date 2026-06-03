@@ -6,12 +6,12 @@
  */
 
 import { PrevcPhase, PrevcRole, StatusType } from '../types';
-import type { RequiredArtifactInput } from '../../services/harness/taskContractsService';
+import type { RequiredArtifactInput } from '../../../application/contracts/taskContractsService';
 
 /**
  * Keyword-based mapping from plan-local phase names to PREVC phases.
  * Re-exported here for compatibility; canonical definition lives in
- * `src/workflow/phases.ts`.
+ * `src/harness/domain/workflow/phases.ts`.
  */
 export { PLAN_PHASE_TO_PREVC } from '../phases';
 

@@ -33,10 +33,10 @@ import {
   type HarnessTaskContract,
   type HarnessHandoffContract,
   type WorkflowHarnessBinding,
-} from '../harness';
-import { createI18nCoverageSensor } from '../harness/sensors/i18nCoverage';
-import { createTestsPassingSensor } from '../harness/sensors/testsPassing';
-import { createTypecheckCleanSensor } from '../harness/sensors/typecheckClean';
+} from '..';
+import { createI18nCoverageSensor } from '../../adapters/out/sensors/i18nCoverage';
+import { createTestsPassingSensor } from '../../adapters/out/sensors/testsPassing';
+import { createTypecheckCleanSensor } from '../../adapters/out/sensors/typecheckClean';
 
 const exec = promisify(execCallback);
 
@@ -252,7 +252,7 @@ export class HarnessSessionFacade {
       expectedOutputs?: string[];
       acceptanceCriteria?: string[];
       requiredSensors?: string[];
-      requiredArtifacts?: import('../harness').RequiredArtifactInput[];
+      requiredArtifacts?: import('..').RequiredArtifactInput[];
       metadata?: Record<string, unknown>;
     }
   ): Promise<HarnessTaskContract> {

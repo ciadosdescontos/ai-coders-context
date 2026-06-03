@@ -5,17 +5,17 @@
  */
 
 import * as path from 'path';
-import { WorkflowService } from '../workflow';
-import { HarnessWorkflowStateService } from './workflowStateService';
+import { WorkflowService } from './workflowService';
+import { HarnessWorkflowStateService } from '../../adapters/out/workflowState/workflowStateService';
 import {
   PHASE_NAMES_EN,
-} from '../../workflow/phases';
+} from '../../domain/workflow/phases';
 import {
   createPlanLinker,
-} from '../../workflow/plans';
-import { PrevcStatusManager } from '../../workflow/status/statusManager';
-import { GitService } from '../../utils/gitService';
-import type { PrevcPhase } from '../../workflow/types';
+} from '../../domain/workflow/plans';
+import { PrevcStatusManager } from '../../domain/workflow/status/statusManager';
+import { GitService } from '../../../utils/gitService';
+import type { PrevcPhase } from '../../domain/workflow/types';
 
 export interface HarnessPlansServiceOptions {
   repoPath: string;

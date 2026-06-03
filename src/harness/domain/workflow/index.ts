@@ -2,18 +2,12 @@
  * PREVC Workflow System
  *
  * Stable workflow barrel.
- *
- * Prefer direct imports for internal-only registries, guidance helpers,
- * collaboration infrastructure, and orchestration implementation details.
  */
 
-// Types
 export * from './types';
 
-// Agent types (surfaced for MCP adapters)
 export { AGENT_TYPES, type AgentType } from './orchestration/agentOrchestrator';
 
-// Errors
 export {
   WorkflowError,
   WorkflowGateError,
@@ -24,7 +18,6 @@ export {
 } from './errors';
 export type { PhaseStatusDivergence } from './errors';
 
-// Gates
 export {
   WorkflowGateChecker,
   createGateChecker,
@@ -33,7 +26,6 @@ export {
   GateStatus,
 } from './gates';
 
-// Roles
 export {
   PREVC_ROLES,
   ROLE_DISPLAY_NAMES,
@@ -42,7 +34,6 @@ export {
   isValidRole,
 } from './roles';
 
-// Phases
 export {
   PREVC_PHASE_ORDER,
   PREVC_PHASES,
@@ -59,7 +50,6 @@ export {
   getPhaseOrder,
 } from './phases';
 
-// Scaling
 export { ProjectScale } from './types';
 export {
   SCALE_ROUTES,
@@ -73,10 +63,8 @@ export {
   getEstimatedTime,
 } from './scaling';
 
-// Status Management
 export { PrevcStatusManager } from './status/statusManager';
 
-// Orchestrator
 export {
   PrevcOrchestrator,
   WorkflowSummary,
@@ -84,7 +72,6 @@ export {
   InitWorkflowOptions,
 } from './orchestrator';
 
-// Plan Integration
 export {
   PlanLinker,
   createPlanLinker,
@@ -100,7 +87,6 @@ export {
   AcceptanceFailedError,
 } from './plans';
 
-// Skills
 export {
   Skill,
   SkillMetadata,
