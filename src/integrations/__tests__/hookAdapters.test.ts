@@ -3,12 +3,16 @@ import {
   createCodexHookAdapter,
   createPiDevHookAdapter,
 } from '..';
+import {
+  postToolUseWriteFixture,
+  sessionStartFixture,
+} from '../fixtures/hostHookEvents';
 
 describe('host hook integrations', () => {
   const runtime = {
     execute: jest.fn().mockResolvedValue({
       kind: 'json',
-      data: { ok: true },
+      data: { initialized: true, docs: true },
     }),
   };
 
@@ -17,23 +21,34 @@ describe('host hook integrations', () => {
   });
 
   it.each([
-    ['claude-code', createClaudeCodeHookAdapter],
-    ['codex', createCodexHookAdapter],
-    ['pi-dev', createPiDevHookAdapter],
-  ])('creates a %s hook adapter over the generic harness hook contract', async (source, createAdapter) => {
+    ['claude-code', createClaudeCodeHookAdapter, sessionStartFixture],
+    ['codex', createCodexHookAdapter, sessionStartFixture],
+    [
+      'pi-dev',
+      createPiDevHookAdapter,
+      { type: 'session_start' as const, cwd: '/tmp/repo' },
+    ],
+  ])('creates a %s hook adapter with default mapEvent', async (source, createAdapter, event) => {
     const adapter = createAdapter({ runtime });
+    const response = await adapter.handle(event);
 
-    const response = await adapter.handle({
-      tool: 'context',
-      params: { action: 'check' },
-    });
-
-    expect(runtime.execute).toHaveBeenCalledWith({
-      tool: 'context',
-      params: { action: 'check' },
-    });
+    expect(runtime.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool: 'context',
+        params: expect.objectContaining({ action: 'check' }),
+      })
+    );
     expect(response.ok).toBe(true);
     expect(response.source).toBe(source);
+  });
+
+  it('rejects PostToolUse through the default Claude Code adapter without harness session binding', async () => {
+    const adapter = createClaudeCodeHookAdapter({ runtime });
+
+    await expect(adapter.handle(postToolUseWriteFixture)).rejects.toThrow(
+      'Unsupported Claude Code hook event: PostToolUse'
+    );
+    expect(runtime.execute).not.toHaveBeenCalled();
   });
 
   it('forces the host source after mapping the event envelope', async () => {

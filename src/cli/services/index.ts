@@ -18,6 +18,29 @@ export {
 } from './mcpInstallService';
 
 export {
+  HookInstallService,
+  buildHookInstallHostChoices,
+  resolveHookInstallHostSelection,
+  type HookInstallServiceDependencies,
+  type HookInstallOptions,
+  type HookUninstallOptions,
+  type HookInstallResult,
+  type HookInstallation,
+  type HookHost,
+  type HookInstallToolChoice,
+  type HookInstallToolPrompt,
+  type ResolveHookInstallHostSelectionOptions,
+} from './hookInstallService';
+
+export {
+  HookDispatchService,
+  runHookDispatch,
+  type HookDispatchOptions,
+  type HookDispatchResult,
+  type HookDispatchSource,
+} from './hookDispatchService';
+
+export {
   StateDetector,
   default as DefaultStateDetector,
   type ProjectState,

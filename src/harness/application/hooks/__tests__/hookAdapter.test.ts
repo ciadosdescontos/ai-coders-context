@@ -4,7 +4,7 @@ import * as path from 'path';
 
 import {
   HarnessHookAdapter,
-  createClaudeCodeHarnessHookAdapter,
+  createHarnessHookAdapter,
 } from '../hookAdapter';
 
 describe('HarnessHookAdapter', () => {
@@ -54,7 +54,7 @@ describe('HarnessHookAdapter', () => {
         data: { initialized: false },
       }),
     };
-    const adapter = createClaudeCodeHarnessHookAdapter({ runtime });
+    const adapter = createHarnessHookAdapter({ runtime, source: 'claude-code' });
 
     const response = await adapter.handle({
       tool: 'context',

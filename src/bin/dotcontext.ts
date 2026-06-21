@@ -19,6 +19,9 @@ import type { TranslateFn, Locale, TranslationKey } from '../utils/i18n';
 import {
   MCPInstallService,
   resolveMcpInstallToolSelection,
+  HookInstallService,
+  resolveHookInstallHostSelection,
+  runHookDispatch,
   SyncService,
   ImportRulesService,
   ImportAgentsService,
@@ -293,6 +296,110 @@ program
       }
     } catch (error) {
       ui.displayError(t('errors.mcp.installFailed', { tool: tool || 'unknown' }), error as Error);
+      process.exit(1);
+    }
+  });
+
+// Hook commands
+const hookCommand = program
+  .command('hook')
+  .description(t('commands.hook.description'));
+
+hookCommand
+  .command('install [host]')
+  .description(t('commands.hookInstall.description'))
+  .option('-g, --global', t('commands.hookInstall.options.global'), true)
+  .option('-l, --local', t('commands.hookInstall.options.local'))
+  .option('--dry-run', t('commands.hookInstall.options.dryRun'))
+  .option('--format <format>', t('commands.hookInstall.options.format'), 'json')
+  .option('-v, --verbose', t('commands.hookInstall.options.verbose'))
+  .action(async (host: string | undefined, options: any) => {
+    try {
+      const hookInstallService = new HookInstallService({ ui, t, version: VERSION });
+      const selectedHost = await resolveHookInstallHostSelection({
+        selectedHost: host,
+        isInteractive: Boolean(process.stdin.isTTY),
+        service: hookInstallService,
+        t,
+        promptHost: ({ message, choices }) => themedSelect({ message, choices }),
+      });
+
+      await hookInstallService.runInstall({
+        host: selectedHost,
+        global: options.local ? false : options.global,
+        dryRun: options.dryRun,
+        verbose: options.verbose,
+        format: options.format === 'toml' ? 'toml' : 'json',
+        repoPath: process.cwd(),
+      });
+    } catch (error) {
+      ui.displayError(t('errors.hook.unsupportedHost', {
+        host: host || 'unknown',
+        supported: 'claude-code, codex, pi',
+      }), error as Error);
+      process.exit(1);
+    }
+  });
+
+hookCommand
+  .command('dispatch')
+  .description(t('commands.hookDispatch.description'))
+  .requiredOption('--source <host>', t('commands.hookDispatch.options.source'))
+  .option('--repo-path <path>', t('commands.hookDispatch.options.repoPath'))
+  .action(async (options: any) => {
+    try {
+      const source = options.source as 'claude-code' | 'codex';
+      if (source !== 'claude-code' && source !== 'codex') {
+        ui.displayError(t('errors.hook.unsupportedHost', {
+          host: source,
+          supported: 'claude-code, codex',
+        }));
+        process.exit(1);
+      }
+
+      const result = await runHookDispatch({
+        source,
+        repoPath: options.repoPath,
+      });
+      process.exit(result.exitCode);
+    } catch (error) {
+      ui.displayError(t('errors.hook.dispatchFailed'), error as Error);
+      process.exit(1);
+    }
+  });
+
+hookCommand
+  .command('uninstall [host]')
+  .description(t('commands.hookUninstall.description'))
+  .option('-g, --global', t('commands.hookInstall.options.global'), true)
+  .option('-l, --local', t('commands.hookInstall.options.local'))
+  .option('--dry-run', t('commands.hookInstall.options.dryRun'))
+  .option('--format <format>', t('commands.hookInstall.options.format'), 'json')
+  .option('-v, --verbose', t('commands.hookInstall.options.verbose'))
+  .action(async (host: string | undefined, options: any) => {
+    try {
+      const hookInstallService = new HookInstallService({ ui, t, version: VERSION });
+      const selectedHost = await resolveHookInstallHostSelection({
+        selectedHost: host,
+        isInteractive: Boolean(process.stdin.isTTY),
+        service: hookInstallService,
+        t,
+        promptHost: ({ message, choices }) => themedSelect({ message, choices }),
+      });
+
+      await hookInstallService.runUninstall({
+        host: selectedHost,
+        global: options.local ? false : options.global,
+        dryRun: options.dryRun,
+        verbose: options.verbose,
+        format: options.format === 'toml' ? 'toml' : 'json',
+        repoPath: process.cwd(),
+      });
+    } catch (error) {
+      ui.displayError(t('errors.hook.unsupportedHost', {
+        host: host || 'unknown',
+        supported: 'claude-code, codex, pi',
+      }), error as Error);
       process.exit(1);
     }
   });

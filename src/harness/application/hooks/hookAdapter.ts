@@ -196,21 +196,3 @@ export function createHarnessHookAdapter(
 ): HarnessHookAdapter {
   return new HarnessHookAdapter(options);
 }
-
-export function createClaudeCodeHarnessHookAdapter(
-  options: Omit<HarnessHookAdapterOptions, 'source'>
-): HarnessHookAdapter {
-  return new HarnessHookAdapter({ ...options, source: 'claude-code' });
-}
-
-export function createCodexHarnessHookAdapter(
-  options: Omit<HarnessHookAdapterOptions, 'source'>
-): HarnessHookAdapter {
-  return new HarnessHookAdapter({ ...options, source: 'codex' });
-}
-
-export function createPiDevHarnessHookAdapter(
-  options: Omit<HarnessHookAdapterOptions, 'source'>
-): HarnessHookAdapter {
-  return new HarnessHookAdapter({ ...options, source: 'pi-dev' });
-}

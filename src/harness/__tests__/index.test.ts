@@ -5,9 +5,6 @@ import {
   HARNESS_ADAPTER_TOOL_NAMES,
   HarnessHookAdapter,
   createHarnessHookAdapter,
-  createClaudeCodeHarnessHookAdapter,
-  createCodexHarnessHookAdapter,
-  createPiDevHarnessHookAdapter,
   HarnessActionService,
   HarnessAgentActionService,
   HarnessSkillActionService,
@@ -41,9 +38,6 @@ describe('Harness boundary exports', () => {
     expect(HARNESS_ADAPTER_TOOL_NAMES).toContain('workflow-advance');
     expect(HarnessHookAdapter).toBeDefined();
     expect(createHarnessHookAdapter).toBeDefined();
-    expect(createClaudeCodeHarnessHookAdapter).toBeDefined();
-    expect(createCodexHarnessHookAdapter).toBeDefined();
-    expect(createPiDevHarnessHookAdapter).toBeDefined();
     expect(HarnessActionService).toBeDefined();
     expect(HarnessAgentActionService).toBeDefined();
     expect(HarnessSkillActionService).toBeDefined();
