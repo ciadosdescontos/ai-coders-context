@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-Hooks conectam o dotcontext aos eventos de ciclo de vida do seu agente. Em vez de depender do MCP em cada início de sessão, hooks executam chamadas leves ao harness: verificar `.context/`, registrar traces após Write/Edit/Bash e mostrar status PREVC ao encerrar.
+Hooks conectam o dotcontext aos eventos de ciclo de vida do seu agente. Em vez de depender do MCP em cada início de sessão, hooks executam chamadas leves ao harness: verificar `.context/`, registrar traces após Write/Edit/Bash e mostrar status PREVC ao encerrar quando existe um workflow PREVC ativo.
 
 :::tip[Hooks vs MCP]
 Use **hooks** para bootstrap, tracing e lembretes (baixo custo de tokens). Use **MCP** para a superfície completa (`context init`, `workflow-init`, sensores, planos). A maioria dos usuários de Claude Code e Codex se beneficia dos dois.
@@ -37,7 +37,7 @@ Flags: `--global`, `--local`, `--dry-run`, `--format json|toml` (Codex), `-v`. L
 | Início de sessão | `context` → `check` | Injeta índice compacto se `.context/` existir |
 | Sem `.context/` | informativo | Dica para inicializar via MCP |
 | Pós ferramenta (Write/Edit/Bash) | `harness` → `appendTrace` | Trace em `.context/runtime/` |
-| Stop / fim | `workflow-guide` | Próximos passos, skills e dicas de gate PREVC |
+| Stop / fim | `workflow-guide` | Próximos passos, skills e dicas de gate PREVC somente quando existe um workflow PREVC ativo |
 
 Hooks são **não bloqueantes** por padrão.
 

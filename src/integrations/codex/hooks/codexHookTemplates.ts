@@ -62,12 +62,18 @@ export function isCurrentCodexHookCommand(command: unknown): boolean {
   return isCurrentDotcontextHookDispatchCommand(command, 'codex');
 }
 
-export function buildCodexTomlHookBlocks(): string {
-  const lines: string[] = [
-    '[features]',
-    'hooks = true',
-    '',
-  ];
+export interface BuildCodexTomlHookBlocksOptions {
+  includeFeatures?: boolean;
+}
+
+export function buildCodexTomlHookBlocks(
+  options: BuildCodexTomlHookBlocksOptions = {}
+): string {
+  const lines: string[] = [];
+
+  if (options.includeFeatures ?? true) {
+    lines.push('[features]', 'hooks = true', '');
+  }
 
   for (const [eventName, entries] of Object.entries(CODEX_HOOK_TEMPLATES)) {
     for (const entry of entries) {

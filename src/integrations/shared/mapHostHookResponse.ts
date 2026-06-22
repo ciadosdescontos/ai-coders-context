@@ -42,16 +42,22 @@ function formatContextAdditionalContext(data: unknown): string {
   return `dotcontext: scaffold ready (${enabled.join(', ')}). Use MCP context tools for navigation and workflow.`;
 }
 
-function formatWorkflowGuideAdditionalContext(data: unknown): string {
+function formatWorkflowGuideAdditionalContext(data: unknown): string | undefined {
   if (!isRecord(data)) {
-    return 'dotcontext: workflow guide unavailable.';
+    return undefined;
   }
 
-  if (typeof data.excerpt === 'string' && data.excerpt.length > 0) {
-    return data.excerpt;
+  const workflow = data.workflow;
+  if (data.skipped === true || (isRecord(workflow) && workflow.active === false)) {
+    return undefined;
   }
 
-  return 'dotcontext: workflow guide unavailable.';
+  if (typeof data.excerpt === 'string') {
+    const excerpt = data.excerpt.trim();
+    return excerpt.length > 0 ? excerpt : undefined;
+  }
+
+  return undefined;
 }
 
 function mapSuccessResponse(
@@ -70,10 +76,15 @@ function mapSuccessResponse(
   }
 
   if (hostEventName === 'Stop' && response.tool === 'workflow-guide') {
+    const additionalContext = formatWorkflowGuideAdditionalContext(data);
+    if (!additionalContext) {
+      return { continue: true };
+    }
+
     return {
       hookSpecificOutput: {
         hookEventName: 'Stop',
-        additionalContext: formatWorkflowGuideAdditionalContext(data),
+        additionalContext,
       },
     };
   }

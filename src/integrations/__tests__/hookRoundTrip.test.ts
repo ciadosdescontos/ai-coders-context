@@ -6,6 +6,7 @@ import {
   mapClaudeCodeResponse,
   mapCodexEvent,
   mapCodexResponse,
+  mapHostHookResponse,
   mapPiEvent,
   mapPiResponse,
   normalizeToolEvent,
@@ -144,6 +145,29 @@ describe('hook mapper unit tests', () => {
     });
   });
 
+  describe('mapHostHookResponse', () => {
+    it.each([
+      ['skipped', { skipped: true, workflow: { active: true }, excerpt: 'guide text' }],
+      ['blank', { workflow: { active: true }, excerpt: '  \n  ' }],
+      ['inactive', { workflow: { active: false }, excerpt: 'No active PREVC workflow.' }],
+    ])('continues silently for %s Stop workflow-guide output', (_name, data) => {
+      const response: HarnessHookResponse = {
+        ok: true,
+        tool: 'workflow-guide',
+        source: 'codex',
+        result: {
+          kind: 'json',
+          data,
+        },
+      };
+
+      expect(mapHostHookResponse('Stop', response, { source: 'codex' })).toEqual({
+        source: 'codex',
+        continue: true,
+      });
+    });
+  });
+
   describe('mapPiEvent', () => {
     it('maps session_start to context check', () => {
       expect(
@@ -192,6 +216,50 @@ describe('hook mapper unit tests', () => {
 
       expect(output.source).toBe('pi-dev');
       expect(output.silent).toBe(true);
+    });
+
+    it('suppresses agent_end workflow guidance when workflow is inactive', () => {
+      const output = mapPiResponse(
+        { type: 'agent_end', cwd: '/tmp/repo', sessionId: 'pi-1' },
+        {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'pi-dev',
+          result: {
+            kind: 'json',
+            data: {
+              workflow: { active: false },
+              excerpt: 'dotcontext workflow guide:\nNo active PREVC workflow.',
+            },
+          },
+        }
+      );
+
+      expect(output).toEqual({
+        source: 'pi-dev',
+        silent: true,
+      });
+    });
+
+    it('counts workflow and harness as scaffold readiness on session_start', () => {
+      const output = mapPiResponse(
+        { type: 'session_start', cwd: '/tmp/repo', sessionId: 'pi-1' },
+        {
+          ok: true,
+          tool: 'context',
+          source: 'pi-dev',
+          result: {
+            kind: 'json',
+            data: {
+              initialized: true,
+              workflow: true,
+              harness: true,
+            },
+          },
+        }
+      );
+
+      expect(output.additionalContext).toContain('scaffold ready (workflow, harness)');
     });
   });
 });

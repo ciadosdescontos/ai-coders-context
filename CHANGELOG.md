@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Reduced host hook noise: Stop/session-end hooks now emit PREVC workflow guidance only when an active workflow exists.
+- Kept `hook dispatch` stdout machine-readable by skipping the global update check for hook dispatch commands.
+- Prevented `SessionStart` hooks from creating `.context/runtime` before context initialization has been confirmed.
+- Made hook tracing more resilient by recovering stale hook session bindings and treating trace append failures as non-blocking.
+- Suppressed inactive, skipped, blank, or malformed workflow-guide output in Claude Code, Codex, and Pi hook renderers.
+- Made Stop hooks silently continue when workflow state is missing or malformed instead of returning non-zero hook failures.
+- Aligned Pi session-start context summaries with Claude/Codex by recognizing `workflow` and `harness` readiness flags.
+
+### Changed
+
+- Anchored the Claude Code `PostToolUse` matcher to exact `Write`, `Edit`, and `Bash` events.
+- Tightened Codex TOML hook install detection so partially installed hook blocks are repaired instead of being treated as up to date.
+- Updated hook documentation to clarify that session-end PREVC reminders appear only for active workflows.
+
 ## [1.0.0]
 
 This is a structural refactor of dotcontext ahead of **1.0.0**. It replaces the monolithic `src/services` / `src/workflow` layout with a **hexagonal harness core** and **thin adapters** for CLI, MCP, and host hooks.

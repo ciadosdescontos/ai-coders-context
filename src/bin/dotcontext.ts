@@ -121,7 +121,11 @@ function scheduleVersionCheck(force: boolean = false): Promise<void> {
   return versionCheckPromise;
 }
 
-program.hook('preAction', () => {
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  if (actionCommand.name() === 'dispatch' && actionCommand.parent?.name() === 'hook') {
+    return;
+  }
+
   void scheduleVersionCheck();
 });
 

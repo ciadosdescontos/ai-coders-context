@@ -379,7 +379,7 @@ args = ["-y", "@dotcontext/mcp@latest"]
 
 ### Hook Install (Claude Code, Codex CLI, Pi)
 
-Lifecycle hooks bootstrap context, append durable traces after file edits, and surface workflow reminders at session end — with lower token cost than loading the full MCP surface on every turn.
+Lifecycle hooks bootstrap context, append durable traces after file edits, and surface workflow reminders at session end when an active PREVC workflow exists — with lower token cost than loading the full MCP surface on every turn.
 
 ```bash
 npx -y @dotcontext/cli@latest hook install

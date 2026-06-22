@@ -31,7 +31,7 @@ function formatContextMessage(data: unknown): string {
   }
 
   const enabled: string[] = [];
-  for (const key of ['docs', 'agents', 'skills', 'plans'] as const) {
+  for (const key of ['docs', 'agents', 'skills', 'plans', 'workflow', 'harness'] as const) {
     if (data[key]) {
       enabled.push(key);
     }
@@ -49,8 +49,14 @@ function formatWorkflowGuideNotify(data: unknown): string | undefined {
     return undefined;
   }
 
-  if (typeof data.excerpt === 'string' && data.excerpt.length > 0) {
-    return data.excerpt;
+  const workflow = data.workflow;
+  if (data.skipped === true || (isRecord(workflow) && workflow.active === false)) {
+    return undefined;
+  }
+
+  if (typeof data.excerpt === 'string') {
+    const excerpt = data.excerpt.trim();
+    return excerpt.length > 0 ? excerpt : undefined;
   }
 
   return undefined;

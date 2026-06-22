@@ -5,7 +5,6 @@ import * as path from 'path';
 import {
   buildCodexHooksDocument,
   buildCodexTomlHookBlocks,
-  CODEX_HOOK_DISPATCH_COMMAND,
   CODEX_HOOK_TEMPLATES,
   CODEX_HOOK_TRUST_REMINDER,
   isDotcontextCodexHookCommand,
@@ -117,12 +116,14 @@ function hooksInstalled(document: unknown): boolean {
   return true;
 }
 
-function tomlUpToDate(content: string): boolean {
-  return content.includes(CODEX_HOOK_DISPATCH_COMMAND);
+interface ParsedCodexTomlHookBlock {
+  eventName: string;
+  matcher?: string;
+  commands: string[];
 }
 
-function parseTomlCommandLine(line: string): string | undefined {
-  const match = line.trim().match(/^command\s*=\s*(.+)$/);
+function parseTomlStringAssignment(line: string, key: string): string | undefined {
+  const match = line.trim().match(new RegExp(`^${key}\\s*=\\s*(.+)$`));
   if (!match) {
     return undefined;
   }
@@ -134,6 +135,115 @@ function parseTomlCommandLine(line: string): string | undefined {
   }
 }
 
+function parseTomlCommandLine(line: string): string | undefined {
+  return parseTomlStringAssignment(line, 'command');
+}
+
+function parseTomlMatcherLine(line: string): string | undefined {
+  return parseTomlStringAssignment(line, 'matcher');
+}
+
+function parseCodexTomlHookBlocks(content: string): ParsedCodexTomlHookBlock[] {
+  const blocks: ParsedCodexTomlHookBlock[] = [];
+  let current: ParsedCodexTomlHookBlock | undefined;
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    const hookHeader = trimmed.match(/^\[\[hooks\.(SessionStart|PostToolUse|Stop)\]\]$/);
+
+    if (hookHeader) {
+      if (current) {
+        blocks.push(current);
+      }
+      current = {
+        eventName: hookHeader[1],
+        commands: [],
+      };
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    if (trimmed.startsWith('[')) {
+      blocks.push(current);
+      current = undefined;
+      continue;
+    }
+
+    const matcher = parseTomlMatcherLine(line);
+    if (matcher !== undefined) {
+      current.matcher = matcher;
+    }
+
+    const command = parseTomlCommandLine(line);
+    if (command !== undefined) {
+      current.commands.push(command);
+    }
+  }
+
+  if (current) {
+    blocks.push(current);
+  }
+
+  return blocks;
+}
+
+function tomlHooksFeatureEnabled(content: string): boolean {
+  let inFeatures = false;
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+
+    if (trimmed === '[features]') {
+      inFeatures = true;
+      continue;
+    }
+
+    if (trimmed.startsWith('[')) {
+      inFeatures = false;
+      continue;
+    }
+
+    if (inFeatures && /^hooks\s*=\s*true$/.test(trimmed)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function tomlBlockMatchesTemplate(
+  block: ParsedCodexTomlHookBlock,
+  template: CodexHookMatcherEntry
+): boolean {
+  return block.matcher === template.matcher
+    && block.commands.some((command) => isCurrentCodexHookCommand(command));
+}
+
+function tomlUpToDate(content: string): boolean {
+  if (!tomlHooksFeatureEnabled(content)) {
+    return false;
+  }
+
+  const blocks = parseCodexTomlHookBlocks(content);
+
+  for (const [eventName, templates] of Object.entries(CODEX_HOOK_TEMPLATES)) {
+    for (const template of templates) {
+      const hasCurrentBlock = blocks.some((block) => (
+        block.eventName === eventName && tomlBlockMatchesTemplate(block, template)
+      ));
+
+      if (!hasCurrentBlock) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function tomlHasDotcontextHooks(content: string): boolean {
   return content.split('\n').some((line) => {
     const command = parseTomlCommandLine(line);
@@ -141,15 +251,44 @@ function tomlHasDotcontextHooks(content: string): boolean {
   });
 }
 
+function ensureTomlHooksFeatureEnabled(content: string): string {
+  const lines = content.split('\n');
+  const featuresIndex = lines.findIndex((line) => line.trim() === '[features]');
+
+  if (featuresIndex === -1) {
+    const base = content.trimEnd();
+    return base ? `${base}\n\n[features]\nhooks = true\n` : '[features]\nhooks = true\n';
+  }
+
+  let insertIndex = featuresIndex + 1;
+  for (let index = featuresIndex + 1; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (trimmed.startsWith('[')) {
+      break;
+    }
+
+    if (/^hooks\s*=/.test(trimmed)) {
+      lines[index] = 'hooks = true';
+      return lines.join('\n').trimEnd() + '\n';
+    }
+
+    insertIndex = index + 1;
+  }
+
+  lines.splice(insertIndex, 0, 'hooks = true');
+  return lines.join('\n').trimEnd() + '\n';
+}
+
 function appendTomlHooks(existing: string): string {
   if (tomlUpToDate(existing)) {
     return existing;
   }
 
-  const base = tomlHasDotcontextHooks(existing)
+  const withoutDotcontextHooks = tomlHasDotcontextHooks(existing)
     ? removeDotcontextTomlHooks(existing)
     : existing.trimEnd();
-  const block = buildCodexTomlHookBlocks();
+  const base = ensureTomlHooksFeatureEnabled(withoutDotcontextHooks).trimEnd();
+  const block = buildCodexTomlHookBlocks({ includeFeatures: false });
   return base ? `${base}\n\n${block}` : block;
 }
 
@@ -241,43 +380,66 @@ function removeDotcontextJsonHooks(document: unknown): { hooks: Record<string, C
 function removeDotcontextTomlHooks(content: string): string {
   const lines = content.split('\n');
   const filtered: string[] = [];
-  let skippingBlock = false;
+  let index = 0;
 
-  for (const line of lines) {
+  while (index < lines.length) {
+    const line = lines[index];
     const trimmed = line.trim();
 
-    if (trimmed === '[features]' || trimmed === 'hooks = true') {
-      continue;
-    }
-
     if (/^\[\[hooks\.(SessionStart|PostToolUse|Stop)\]\]$/.test(trimmed)) {
-      skippingBlock = true;
+      const blockLines: string[] = [];
+      let blockHasDotcontextHook = false;
+
+      while (index < lines.length) {
+        const blockLine = lines[index];
+        const blockTrimmed = blockLine.trim();
+
+        if (blockLines.length > 0 && blockTrimmed.startsWith('[')) {
+          break;
+        }
+
+        blockLines.push(blockLine);
+        const command = parseTomlCommandLine(blockLine);
+        if (command && isDotcontextCodexHookCommand(command)) {
+          blockHasDotcontextHook = true;
+        }
+        index += 1;
+      }
+
+      if (!blockHasDotcontextHook) {
+        filtered.push(...blockLines);
+      }
       continue;
-    }
-
-    if (skippingBlock) {
-      if (trimmed.startsWith('matcher =')) {
-        continue;
-      }
-
-      const command = parseTomlCommandLine(line);
-      if (command && isDotcontextCodexHookCommand(command)) {
-        skippingBlock = false;
-        continue;
-      }
-
-      if (trimmed === '') {
-        skippingBlock = false;
-        continue;
-      }
-
-      skippingBlock = false;
     }
 
     filtered.push(line);
+    index += 1;
   }
 
-  return filtered.join('\n').trimEnd() + (filtered.length > 0 ? '\n' : '');
+  const withoutFeatureHook: string[] = [];
+  let inFeatures = false;
+
+  for (const line of filtered) {
+    const trimmed = line.trim();
+
+    if (trimmed === '[features]') {
+      inFeatures = true;
+      withoutFeatureHook.push(line);
+      continue;
+    }
+
+    if (trimmed.startsWith('[')) {
+      inFeatures = false;
+    }
+
+    if (inFeatures && /^hooks\s*=\s*true$/.test(trimmed)) {
+      continue;
+    }
+
+    withoutFeatureHook.push(line);
+  }
+
+  return withoutFeatureHook.join('\n').trimEnd() + (withoutFeatureHook.length > 0 ? '\n' : '');
 }
 
 export async function uninstallCodexHooks(

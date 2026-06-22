@@ -134,6 +134,7 @@ describe('HookInstallService', () => {
       expect(config.hooks.SessionStart).toBeDefined();
       expect(config.hooks.PostToolUse).toBeDefined();
       expect(config.hooks.Stop).toBeDefined();
+      expect(config.hooks.PostToolUse[0].matcher).toBe('^Write$|^Edit$|^Bash$');
 
       const command = config.hooks.SessionStart[0].hooks[0];
       expect(command.type).toBe('command');

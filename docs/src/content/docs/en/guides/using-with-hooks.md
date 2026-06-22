@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-Host hooks connect dotcontext to your coding agent's lifecycle events. Instead of relying on MCP for every session start and file edit, hooks run lightweight harness calls in the background: check whether `.context/` exists, append traces after write/edit/bash tools, and surface PREVC workflow status when a session ends.
+Host hooks connect dotcontext to your coding agent's lifecycle events. Instead of relying on MCP for every session start and file edit, hooks run lightweight harness calls in the background: check whether `.context/` exists, append traces after write/edit/bash tools, and surface PREVC workflow status when a session ends with an active PREVC workflow.
 
 This guide covers installation, what each hook does, and how hooks complement MCP.
 
@@ -62,7 +62,7 @@ All supported hosts run the same harness actions; only the event envelope differ
 | Session start | `context` → `check` | Inject compact index excerpt when `.context/` exists |
 | Session start (no `.context/`) | none (informational) | One-line hint to run MCP init or initialize context |
 | Post tool use (Write / Edit / Bash) | `harness` → `appendTrace` | Append durable trace under `.context/runtime/` |
-| Stop / session end | `workflow-guide` | Inject compact PREVC next steps, skills, and gate hints |
+| Stop / session end | `workflow-guide` | Inject compact PREVC next steps, skills, and gate hints only when an active PREVC workflow exists |
 
 Hooks are **non-blocking by default**. Harness errors do not stop your agent session.
 
@@ -79,7 +79,7 @@ Wired events (v1):
 | Event | Matcher |
 | --- | --- |
 | `SessionStart` | `*` |
-| `PostToolUse` | `Write\|Edit\|Bash` |
+| `PostToolUse` | `^Write$\|^Edit$\|^Bash$` |
 | `Stop` | `*` |
 
 After install, restart Claude Code. On the next session start in a repo with `.context/`, you should see a compact bootstrap message injected into context.

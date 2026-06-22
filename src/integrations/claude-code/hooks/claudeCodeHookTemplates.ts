@@ -30,7 +30,7 @@ export const CLAUDE_CODE_HOOK_TEMPLATES: Record<
   ],
   PostToolUse: [
     {
-      matcher: 'Write|Edit|Bash',
+      matcher: '^Write$|^Edit$|^Bash$',
       hooks: [{ type: 'command', command: CLAUDE_CODE_HOOK_DISPATCH_COMMAND }],
     },
   ],

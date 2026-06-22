@@ -9,6 +9,7 @@ import * as path from 'path';
 import {
   createHarnessHookAdapter,
   type HarnessHookResponse,
+  WorkflowService,
 } from '../../harness';
 import { mapClaudeCodeResponse } from '../../integrations/claude-code/hooks/mapClaudeCodeResponse';
 import type { ClaudeCodeHookInput } from '../../integrations/claude-code/hooks/mapClaudeCodeEvent';
@@ -16,9 +17,11 @@ import { mapCodexResponse } from '../../integrations/codex/hooks/mapCodexRespons
 import type { CodexHookInput } from '../../integrations/codex/hooks/mapCodexEvent';
 import {
   ensureHookHarnessSession,
+  extractHarnessSessionId,
   getHookHarnessSessionId,
   normalizeToolEvent,
   resolveHarnessHookFromHostEvent,
+  saveHookHarnessSession,
   type HostHookOutput,
 } from '../../integrations/shared';
 import { formatNavigationExcerpt } from '../../integrations/shared/formatNavigationExcerpt';
@@ -92,6 +95,26 @@ function isInitialized(response: HarnessHookResponse): boolean {
     && Boolean((data as { initialized?: boolean }).initialized);
 }
 
+function canonicalizeHookEventName(hookEventName?: string): string | undefined {
+  if (!hookEventName) {
+    return undefined;
+  }
+
+  const normalized = hookEventName.trim().toLowerCase().replace(/[-\s]/g, '_');
+  switch (normalized) {
+    case 'sessionstart':
+    case 'session_start':
+      return 'SessionStart';
+    case 'posttooluse':
+    case 'post_tool_use':
+      return 'PostToolUse';
+    case 'stop':
+      return 'Stop';
+    default:
+      return hookEventName;
+  }
+}
+
 function appendNavigationContext(
   output: HostHookOutput,
   navigationResponse?: HarnessHookResponse
@@ -118,21 +141,120 @@ function mapShellHookOutput(
   source: HookDispatchSource,
   envelope: ClaudeCodeHookInput | CodexHookInput,
   response: HarnessHookResponse,
+  hookEventName?: string,
   navigationResponse?: HarnessHookResponse
 ): HostHookOutput {
+  const mappedEnvelope = hookEventName
+    ? { ...envelope, hook_event_name: hookEventName }
+    : envelope;
   const base = source === 'claude-code'
-    ? mapClaudeCodeResponse(envelope as ClaudeCodeHookInput, response)
-    : mapCodexResponse(envelope as CodexHookInput, response);
+    ? mapClaudeCodeResponse(mappedEnvelope as ClaudeCodeHookInput, response)
+    : mapCodexResponse(mappedEnvelope as CodexHookInput, response);
 
-  const hookEventName = typeof envelope.hook_event_name === 'string'
-    ? envelope.hook_event_name
-    : 'unknown';
+  const mappedHookEventName = hookEventName
+    ?? (typeof envelope.hook_event_name === 'string' ? envelope.hook_event_name : 'unknown');
 
-  if (hookEventName === 'SessionStart') {
+  if (mappedHookEventName === 'SessionStart') {
     return appendNavigationContext(base, navigationResponse);
   }
 
   return base;
+}
+
+async function hasActivePrevcWorkflow(repoPath: string): Promise<boolean> {
+  try {
+    const workflowService = await WorkflowService.create(repoPath);
+    if (!(await workflowService.hasWorkflow())) {
+      return false;
+    }
+
+    return !(await workflowService.isComplete());
+  } catch {
+    return false;
+  }
+}
+
+function createHookDispatchSuccessResponse(
+  source: HookDispatchSource,
+  data: Record<string, unknown>,
+  tool: Extract<HarnessHookResponse, { ok: true }>['tool'] = 'harness'
+): HarnessHookResponse {
+  return {
+    ok: true,
+    tool,
+    source,
+    result: {
+      kind: 'json',
+      data,
+    },
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isAppendTraceRequest(mapped: { tool: string; params: unknown }): boolean {
+  return mapped.tool === 'harness'
+    && isRecord(mapped.params)
+    && mapped.params.action === 'appendTrace';
+}
+
+function isMissingHarnessSessionResponse(
+  response: HarnessHookResponse,
+  harnessSessionId?: string
+): boolean {
+  if (response.ok) {
+    return false;
+  }
+
+  const message = response.error.message;
+  if (!message.includes('Harness session not found')) {
+    return false;
+  }
+
+  return !harnessSessionId || message.includes(harnessSessionId);
+}
+
+async function recreateHookHarnessSession(
+  adapter: Parameters<typeof ensureHookHarnessSession>[0],
+  options: {
+    repoPath: string;
+    source: HookDispatchSource;
+    hostSessionId: string;
+  }
+): Promise<string> {
+  const now = new Date().toISOString();
+  const response = await adapter.handle({
+    tool: 'harness',
+    params: {
+      action: 'createSession',
+      name: `hook:${options.source}:${options.hostSessionId.slice(0, 12)}`,
+      metadata: {
+        host: options.source,
+        hostSessionId: options.hostSessionId,
+        recoveredFromStaleBinding: true,
+      },
+    },
+    source: options.source,
+  });
+
+  const harnessSessionId = extractHarnessSessionId(response);
+  if (!response.ok || !harnessSessionId) {
+    const message = !response.ok ? response.error.message : 'Harness session id missing from createSession response';
+    throw new Error(message);
+  }
+
+  await saveHookHarnessSession({
+    harnessSessionId,
+    hostSessionId: options.hostSessionId,
+    source: options.source,
+    repoPath: options.repoPath,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return harnessSessionId;
 }
 
 async function readStdin(stdin: NodeJS.ReadableStream = process.stdin): Promise<string> {
@@ -151,7 +273,11 @@ async function dispatchShellHookEvent(
   repoPath: string
 ): Promise<{ response: HarnessHookResponse; output: HostHookOutput; navigationResponse?: HarnessHookResponse }> {
   const normalized = normalizeToolEvent(envelope);
-  const hookEventName = normalized.hookEventName;
+  const hookEventName = canonicalizeHookEventName(normalized.hookEventName);
+  const normalizedEvent = {
+    ...normalized,
+    hookEventName,
+  };
   const adapter = createHarnessHookAdapter({ repoPath, source });
 
   if (!hookEventName) {
@@ -159,14 +285,6 @@ async function dispatchShellHookEvent(
   }
 
   if (hookEventName === 'SessionStart') {
-    if (normalized.sessionId) {
-      await ensureHookHarnessSession(adapter, {
-        repoPath,
-        source,
-        hostSessionId: normalized.sessionId,
-      });
-    }
-
     const checkResponse = await adapter.handle({
       tool: 'context',
       params: {
@@ -178,6 +296,14 @@ async function dispatchShellHookEvent(
 
     let navigationResponse: HarnessHookResponse | undefined;
     if (isInitialized(checkResponse)) {
+      if (normalizedEvent.sessionId) {
+        await ensureHookHarnessSession(adapter, {
+          repoPath,
+          source,
+          hostSessionId: normalizedEvent.sessionId,
+        });
+      }
+
       navigationResponse = await adapter.handle({
         tool: 'context',
         params: {
@@ -193,6 +319,7 @@ async function dispatchShellHookEvent(
       source,
       envelope as ClaudeCodeHookInput,
       checkResponse,
+      hookEventName,
       navigationResponse
     );
 
@@ -204,15 +331,15 @@ async function dispatchShellHookEvent(
   }
 
   if (hookEventName === 'PostToolUse') {
-    const harnessSessionId = normalized.sessionId
+    const harnessSessionId = normalizedEvent.sessionId
       ? await getHookHarnessSessionId({
         repoPath,
         source,
-        hostSessionId: normalized.sessionId,
+        hostSessionId: normalizedEvent.sessionId,
       })
       : undefined;
 
-    const mapped = resolveHarnessHookFromHostEvent(normalized, {
+    const mapped = resolveHarnessHookFromHostEvent(normalizedEvent, {
       repoPath,
       harnessSessionId,
     });
@@ -229,10 +356,46 @@ async function dispatchShellHookEvent(
       };
     }
 
-    const response = await adapter.handle({
+    let response = await adapter.handle({
       ...mapped,
       source,
     });
+
+    if (
+      isAppendTraceRequest(mapped)
+      && normalizedEvent.sessionId
+      && isMissingHarnessSessionResponse(response, harnessSessionId)
+    ) {
+      try {
+        const recreatedSessionId = await recreateHookHarnessSession(adapter, {
+          repoPath,
+          source,
+          hostSessionId: normalizedEvent.sessionId,
+        });
+        const retryMapped = resolveHarnessHookFromHostEvent(normalizedEvent, {
+          repoPath,
+          harnessSessionId: recreatedSessionId,
+        });
+        if (retryMapped) {
+          response = await adapter.handle({
+            ...retryMapped,
+            source,
+          });
+        }
+      } catch {
+        response = createHookDispatchSuccessResponse(source, {
+          skipped: true,
+          reason: 'trace_append_failed',
+        });
+      }
+    }
+
+    if (isAppendTraceRequest(mapped) && !response.ok) {
+      response = createHookDispatchSuccessResponse(source, {
+        skipped: true,
+        reason: 'trace_append_failed',
+      });
+    }
 
     return {
       response,
@@ -241,7 +404,25 @@ async function dispatchShellHookEvent(
   }
 
   if (hookEventName === 'Stop') {
-    const mapped = resolveHarnessHookFromHostEvent(normalized, { repoPath });
+    if (!(await hasActivePrevcWorkflow(repoPath))) {
+      return {
+        response: {
+          ok: true,
+          tool: 'workflow-guide',
+          source,
+          result: {
+            kind: 'json',
+            data: {
+              skipped: true,
+              reason: 'no_active_workflow',
+            },
+          },
+        },
+        output: { continue: true },
+      };
+    }
+
+    const mapped = resolveHarnessHookFromHostEvent(normalizedEvent, { repoPath });
     if (!mapped) {
       throw new Error(`Unsupported ${source} hook event: ${hookEventName}`);
     }
@@ -253,7 +434,7 @@ async function dispatchShellHookEvent(
 
     return {
       response,
-      output: mapShellHookOutput(source, envelope as ClaudeCodeHookInput, response),
+      output: mapShellHookOutput(source, envelope as ClaudeCodeHookInput, response, hookEventName),
     };
   }
 
