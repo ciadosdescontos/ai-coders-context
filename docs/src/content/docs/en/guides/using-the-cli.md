@@ -43,15 +43,15 @@ Run the CLI with **no arguments** to enter a guided menu. The CLI first detects 
 
 | Detected state | What you see |
 | --- | --- |
-| **New** project (no `.context/`) | MCP install, reverse sync, or settings |
+| **New** project (no `.context/`) | Integrations, import, or settings |
 | **Unfilled** project (scaffold exists, pending files) | Pending-file list, then the full menu |
 | **Up-to-date** project | Full menu with sync stats |
 
 The full menu surfaces these actions:
 
-- **Quick Sync** — unified export of agents, skills, and docs to your AI tools, with target customization
-- **Reverse Sync** — interactive import from AI tool directories back into `.context/`
-- **MCP Install** — interactive MCP server setup
+- **Synchronize my context** — unified export of agents, skills, and docs to your AI tools, with target customization
+- **Import my context** — interactive import from AI tool directories back into `.context/`
+- **Integrations** — install or uninstall MCP, hooks, and the Pi extension
 - **Settings** — language selection
 - **View Pending** — list files awaiting content (shown when the project is unfilled)
 - **Exit**
@@ -150,9 +150,19 @@ dotcontext admin skill export --preset all
 dotcontext admin skill export --preset claude --force
 ```
 
-## MCP setup from the CLI
+## Integration setup from the CLI
 
-The CLI is also how you wire the MCP server into your editor or agent. There are two distinct commands.
+The CLI is also how you wire MCP, lifecycle hooks, and the Pi extension into your editor or agent. The interactive **Integrations** submenu exposes:
+
+- **Install MCP**
+- **Uninstall MCP**
+- **Install Hooks**
+- **Uninstall Hooks**
+- **Install Pi Extension**
+- **Uninstall Pi Extension**
+- **Back**
+
+The install and uninstall actions use the same command paths documented below. `Uninstall MCP` is wired to `dotcontext mcp:uninstall`.
 
 ### Install the MCP config
 
@@ -174,6 +184,27 @@ dotcontext mcp:install codex --with-hooks
 ```
 
 Options: `[tool]` (omit to be prompted), `-g, --global` (default), `-l, --local`, `--dry-run`, `--with-hooks`, `--no-hooks`, `--hook-format json|toml`, and `-v, --verbose`. Hooks are recommended and optional for Claude Code, Codex CLI, and Pi; they install project-local config by default. See [Using dotcontext with MCP](/guides/using-with-mcp/) for the full list of supported tools and config paths.
+
+### Uninstall MCP config
+
+```bash
+dotcontext mcp:uninstall
+dotcontext mcp:uninstall pi --local
+dotcontext mcp:uninstall codex --dry-run
+```
+
+Options mirror install scope and preview flags: `[tool]`, `-g, --global`, `-l, --local`, `--dry-run`, and `-v, --verbose`.
+
+### Hooks and Pi extension
+
+```bash
+dotcontext hook install
+dotcontext hook uninstall
+dotcontext hook install pi
+dotcontext hook uninstall pi
+```
+
+Pi extension install guidance uses `pi install npm:@dotcontext/pi`. Pi extension uninstall guidance uses the canonical command `pi uninstall @dotcontext/pi`.
 
 ### Run the MCP server
 

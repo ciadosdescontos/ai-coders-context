@@ -54,6 +54,7 @@ Estes comandos aparecem em `dotcontext --help` e são os mais usados no dia a di
 | [`export-rules`](#export-rules) | Exporta as regras de `.context/docs/` para diretórios de ferramentas de IA |
 | [`mcp`](#mcp) | Inicia o servidor MCP (transporte stdio) |
 | [`mcp:install`](#mcpinstall) | Instala a configuração do servidor MCP em ferramentas de IA suportadas |
+| [`mcp:uninstall`](#mcpuninstall) | Remove a configuração do servidor MCP dotcontext de ferramentas de IA suportadas |
 
 A maioria dos comandos aceita um `[repo-path]` posicional (padrão: diretório de trabalho atual), além de `--dry-run` para pré-visualizar, `--force` para sobrescrever e `-v, --verbose` para saída detalhada.
 
@@ -212,15 +213,35 @@ Execuções interativas perguntam sobre hooks recomendados depois da config MCP 
 
 A config MCP é global por padrão; hooks recomendados instalam config local no projeto por padrão. Para Codex, rode `/hooks` dentro do Codex e confie nos hooks do projeto depois que a config for escrita. Para Pi, o fluxo combinado usa o instalador MCP para o snippet MCP e não o duplica pela etapa de hook do Pi.
 
+### mcp:uninstall
+
+Remove a configuração do servidor MCP dotcontext de uma ferramenta de IA suportada. O comando espelha seleção e flags de escopo da instalação:
+
+| Flag | Descrição | Padrão |
+| --- | --- | --- |
+| `[tool]` | Nome de ferramenta específica (omita para escolher interativamente) | pergunta |
+| `-g, --global` | Remove da config global (home) | `true` |
+| `-l, --local` | Remove da config local/no nível do repositório | `false` |
+| `--dry-run` | Pré-visualiza sem gravar | `false` |
+| `-v, --verbose` | Saída detalhada | `false` |
+
+```bash
+dotcontext mcp:uninstall
+dotcontext mcp:uninstall pi --local
+dotcontext mcp:uninstall codex --dry-run
+```
+
+O comando remove apenas entradas MCP do dotcontext e preserva configurações não relacionadas do cliente.
+
 ## Modo interativo
 
 Invocar a CLI sem argumentos (`npx -y @dotcontext/cli@latest`) abre um menu guiado. Primeiro ele detecta o estado do seu projeto — `new`, `unfilled`, `outdated` ou `uptodate` — e então adapta o menu:
 
-- **Projeto novo** — oferece instalação do MCP, reverse-sync ou configurações.
+- **Projeto novo** — oferece Integrações, importação ou configurações.
 - **Projeto não preenchido** — lista os arquivos pendentes aguardando conteúdo e então mostra o menu completo.
 - **Projeto atualizado** — mostra o menu completo com estatísticas de sync.
 
-O menu completo oferece Quick Sync (sync unificado de agentes, skills e docs), Reverse Sync, MCP Install, Settings (seleção de idioma), View Pending (quando há arquivos aguardando conteúdo) e Exit. A ação MCP Install usa o mesmo caminho de recomendação de hooks que `mcp:install`: hooks são oferecidos somente para Claude Code, Codex CLI e Pi, e continuam opcionais.
+O menu completo oferece **Synchronize my context**, **Import my context**, **Integrações**, **Configurações**, **View Pending** (quando há arquivos aguardando conteúdo) e **Exit**. O submenu **Integrações** expõe Instalar MCP, Desinstalar MCP, Instalar Hooks, Desinstalar Hooks, Instalar Extensão Pi, Desinstalar Extensão Pi e Voltar. Instalar MCP usa o mesmo caminho de recomendação de hooks que `mcp:install`: hooks são oferecidos somente para Claude Code, Codex CLI e Pi, e continuam opcionais.
 
 ## Comandos ocultos / admin
 

@@ -37,8 +37,14 @@ export interface MCPInstallOptions {
   repoPath?: string;
 }
 
+export type MCPUninstallOptions = MCPInstallOptions;
+
 export interface MCPInstallResult extends OperationResult {
   installations: MCPInstallation[];
+}
+
+export interface MCPUninstallResult extends OperationResult {
+  uninstallations: MCPUninstallation[];
 }
 
 export interface MCPInstallation {
@@ -46,6 +52,15 @@ export interface MCPInstallation {
   toolDisplayName: string;
   configPath: string;
   action: 'created' | 'updated' | 'skipped';
+  dryRun: boolean;
+  error?: string;
+}
+
+export interface MCPUninstallation {
+  tool: string;
+  toolDisplayName: string;
+  configPath: string;
+  action: 'updated' | 'deleted' | 'skipped';
   dryRun: boolean;
   error?: string;
 }
@@ -61,6 +76,14 @@ export interface MCPInstallToolPrompt {
 }
 
 export interface ResolveMcpInstallToolSelectionOptions {
+  selectedTool?: string;
+  isInteractive: boolean;
+  service: Pick<MCPInstallService, 'getSupportedTools' | 'detectInstalledTools'>;
+  t: TranslateFn;
+  promptTool?: (prompt: MCPInstallToolPrompt) => Promise<string>;
+}
+
+export interface ResolveMcpUninstallToolSelectionOptions {
   selectedTool?: string;
   isInteractive: boolean;
   service: Pick<MCPInstallService, 'getSupportedTools' | 'detectInstalledTools'>;
@@ -91,6 +114,15 @@ interface MCPConfigTemplate {
   parseConfig?: (content: string) => unknown;
   /** Optional serializer for non-JSON config formats */
   serializeConfig?: (config: unknown) => string;
+  /** Function to remove dotcontext MCP config while preserving unrelated config */
+  removeConfig: (config: unknown) => MCPConfigRemoval;
+  /** Whether this config file is dedicated to dotcontext and may be deleted */
+  dedicatedConfigFile?: boolean;
+}
+
+interface MCPConfigRemoval {
+  changed: boolean;
+  config?: unknown;
 }
 
 /**
@@ -104,6 +136,103 @@ const AI_CONTEXT_MCP_SERVER: MCPServerConfig = {
 
 const parseJsonConfig = (content: string): unknown => JSON.parse(content);
 const serializeJsonConfig = (config: unknown): string => JSON.stringify(config, null, 2);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function removeDotcontextFromObjectKey(config: unknown, key: string): MCPConfigRemoval {
+  if (!isRecord(config)) {
+    return { changed: false, config };
+  }
+
+  const entries = config[key];
+  if (!isRecord(entries) || !Object.prototype.hasOwnProperty.call(entries, 'dotcontext')) {
+    return { changed: false, config };
+  }
+
+  const updatedEntries = { ...entries };
+  delete updatedEntries.dotcontext;
+
+  return {
+    changed: true,
+    config: {
+      ...config,
+      [key]: updatedEntries,
+    },
+  };
+}
+
+function removeDotcontextNamedServer(config: unknown): MCPConfigRemoval {
+  if (!isRecord(config) || !Array.isArray(config.servers)) {
+    return { changed: false, config };
+  }
+
+  const servers = config.servers as unknown[];
+  const updatedServers = servers.filter((server) => (
+    !isRecord(server) || server.name !== 'dotcontext'
+  ));
+
+  if (updatedServers.length === servers.length) {
+    return { changed: false, config };
+  }
+
+  return {
+    changed: true,
+    config: {
+      ...config,
+      servers: updatedServers,
+    },
+  };
+}
+
+function parseTomlTableName(line: string): string | undefined {
+  const trimmed = line.trim();
+  const match = /^\[\[?([^\]]+)\]\]?\s*(?:#.*)?$/.exec(trimmed);
+  return match?.[1]?.trim();
+}
+
+function removeCodexTomlDotcontextTables(config: unknown): MCPConfigRemoval {
+  const content = typeof config === 'string' ? config : String(config ?? '');
+  const newline = content.includes('\r\n') ? '\r\n' : '\n';
+  const lines = content.split(/\r?\n/);
+  const output: string[] = [];
+  let changed = false;
+  let removingDotcontextTable = false;
+
+  for (const line of lines) {
+    const tableName = parseTomlTableName(line);
+
+    if (tableName) {
+      removingDotcontextTable = (
+        tableName === 'mcp_servers.dotcontext' ||
+        tableName === 'mcp_servers.dotcontext.env'
+      );
+
+      if (removingDotcontextTable) {
+        changed = true;
+        continue;
+      }
+    }
+
+    if (removingDotcontextTable) {
+      changed = true;
+      continue;
+    }
+
+    output.push(line);
+  }
+
+  if (!changed) {
+    return { changed: false, config: content };
+  }
+
+  const updated = output.join(newline).trimEnd();
+  return {
+    changed: true,
+    config: updated ? `${updated}${newline}` : '',
+  };
+}
 
 function buildCodexTomlConfig(existingConfig: string, server: MCPServerConfig): string {
   const lines = [
@@ -148,6 +277,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Cursor AI
@@ -173,6 +303,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Windsurf (Codeium)
@@ -195,6 +326,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Continue.dev — standalone per-server file
@@ -213,6 +345,10 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const c = config as Record<string, unknown>;
       return !!c?.command;
     },
+    removeConfig: (config) => ({
+      changed: isRecord(config) && !!config.command,
+    }),
+    dedicatedConfigFile: true,
   },
 
   // Claude Desktop - Cross-platform paths
@@ -237,6 +373,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // VS Code (GitHub Copilot)
@@ -262,6 +399,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.servers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'servers'),
   },
 
   // Roo Code
@@ -284,6 +422,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Amazon Q Developer CLI
@@ -306,6 +445,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Gemini CLI
@@ -328,6 +468,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Codex CLI - TOML config
@@ -344,6 +485,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
     ),
     parseConfig: (content) => content,
     serializeConfig: (config) => (typeof config === 'string' ? config : String(config ?? '')),
+    removeConfig: removeCodexTomlDotcontextTables,
   },
 
   // Kiro
@@ -366,6 +508,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Zed Editor - Uses context_servers instead of mcpServers
@@ -392,6 +535,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.context_servers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'context_servers'),
   },
 
   // JetBrains IDEs - Uses servers array with name field
@@ -420,6 +564,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.servers as Array<Record<string, unknown>>;
       return Array.isArray(servers) && servers.some(s => s.name === 'dotcontext');
     },
+    removeConfig: removeDotcontextNamedServer,
   },
 
   // Trae AI (ByteDance)
@@ -442,6 +587,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Kilo Code
@@ -468,6 +614,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const mcp = c?.mcp as Record<string, unknown>;
       return !!mcp?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcp'),
   },
 
   // GitHub Copilot CLI
@@ -490,6 +637,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 
   // Pi
@@ -512,6 +660,7 @@ const MCP_CONFIG_TEMPLATES: MCPConfigTemplate[] = [
       const servers = c?.mcpServers as Record<string, unknown>;
       return !!servers?.['dotcontext'];
     },
+    removeConfig: (config) => removeDotcontextFromObjectKey(config, 'mcpServers'),
   },
 ];
 
@@ -638,6 +787,72 @@ export class MCPInstallService {
   }
 
   /**
+   * Remove dotcontext MCP configuration for specified tools.
+   */
+  async runUninstall(options: MCPUninstallOptions = {}): Promise<MCPUninstallResult> {
+    const result: MCPUninstallResult = {
+      ...createEmptyResult(),
+      uninstallations: [],
+    };
+
+    const { tool, global: isGlobal = true, dryRun = false, verbose = false, repoPath } = options;
+    const basePath = isGlobal ? os.homedir() : (repoPath ? path.resolve(repoPath) : process.cwd());
+    const toolsToUninstall = await this.resolveTools(tool);
+
+    if (toolsToUninstall.length === 0) {
+      this.deps.ui.displayWarning(this.deps.t('warnings.mcp.noToolsDetected'));
+      return result;
+    }
+
+    for (const toolId of toolsToUninstall) {
+      const uninstallation = await this.uninstallForTool(toolId, basePath, isGlobal, dryRun, verbose);
+      result.uninstallations.push(uninstallation);
+
+      if (uninstallation.error) {
+        addError(result, uninstallation.configPath, uninstallation.error);
+      } else if (uninstallation.action === 'updated' || uninstallation.action === 'deleted') {
+        result.filesCreated++;
+      } else if (uninstallation.action === 'skipped') {
+        result.filesSkipped++;
+      }
+    }
+
+    if (!dryRun && result.filesCreated > 0) {
+      this.deps.ui.displaySuccess(
+        this.deps.t('success.mcp.uninstalled', { count: result.filesCreated })
+      );
+    }
+
+    return result;
+  }
+
+  private async resolveTools(tool?: string): Promise<string[]> {
+    if (tool) {
+      if (tool === 'all') {
+        const detected = await this.detectInstalledTools();
+        return detected.length > 0 ? detected : this.getSupportedToolIds();
+      }
+
+      const normalizedTool = resolveMcpToolId(tool);
+      const template = MCP_CONFIG_TEMPLATES.find(t => t.toolId === normalizedTool);
+      if (!template) {
+        this.deps.ui.displayError(
+          this.deps.t('errors.mcp.unsupportedTool', {
+            tool,
+            supported: this.getSupportedToolIds().join(', '),
+          })
+        );
+        return [];
+      }
+
+      return [normalizedTool];
+    }
+
+    const detected = await this.detectInstalledTools();
+    return detected.length > 0 ? detected : this.getSupportedToolIds();
+  }
+
+  /**
    * Install MCP configuration for a single tool
    */
   private async installForTool(
@@ -752,6 +967,188 @@ export class MCPInstallService {
       };
     }
   }
+
+  /**
+   * Uninstall MCP configuration for a single tool.
+   */
+  private async uninstallForTool(
+    toolId: string,
+    basePath: string,
+    isGlobal: boolean,
+    dryRun: boolean,
+    verbose: boolean
+  ): Promise<MCPUninstallation> {
+    const template = MCP_CONFIG_TEMPLATES.find(t => t.toolId === toolId);
+    const toolDef = getToolById(toolId);
+
+    if (!template || !toolDef) {
+      return {
+        tool: toolId,
+        toolDisplayName: toolId,
+        configPath: '',
+        action: 'skipped',
+        dryRun,
+      };
+    }
+
+    const configPath = isGlobal ? template.globalConfigPath : template.localConfigPath;
+    const fullConfigPath = path.join(basePath, configPath);
+    const parseConfig = template.parseConfig ?? parseJsonConfig;
+    const serializeConfig = template.serializeConfig ?? serializeJsonConfig;
+
+    if (!await fs.pathExists(fullConfigPath)) {
+      if (verbose) {
+        this.deps.ui.displayInfo(
+          toolDef.displayName,
+          this.deps.t('info.mcp.notConfigured', { tool: toolDef.displayName, path: fullConfigPath })
+        );
+      }
+      return {
+        tool: toolId,
+        toolDisplayName: toolDef.displayName,
+        configPath: fullConfigPath,
+        action: 'skipped',
+        dryRun,
+      };
+    }
+
+    let existingConfig: unknown;
+    try {
+      const content = await fs.readFile(fullConfigPath, 'utf-8');
+      existingConfig = parseConfig(content);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.deps.ui.displayError(
+        this.deps.t('errors.mcp.uninstallReadFailed', { tool: toolDef.displayName }),
+        error as Error
+      );
+      return {
+        tool: toolId,
+        toolDisplayName: toolDef.displayName,
+        configPath: fullConfigPath,
+        action: 'skipped',
+        dryRun,
+        error: message,
+      };
+    }
+
+    const removal = template.removeConfig(existingConfig);
+    if (!removal.changed) {
+      if (verbose) {
+        this.deps.ui.displayInfo(
+          toolDef.displayName,
+          this.deps.t('info.mcp.notConfigured', { tool: toolDef.displayName, path: fullConfigPath })
+        );
+      }
+      return {
+        tool: toolId,
+        toolDisplayName: toolDef.displayName,
+        configPath: fullConfigPath,
+        action: 'skipped',
+        dryRun,
+      };
+    }
+
+    if (template.dedicatedConfigFile) {
+      if (dryRun) {
+        this.deps.ui.displayInfo(
+          toolDef.displayName,
+          this.deps.t('info.mcp.wouldUninstall', { tool: toolDef.displayName, path: fullConfigPath })
+        );
+        return {
+          tool: toolId,
+          toolDisplayName: toolDef.displayName,
+          configPath: fullConfigPath,
+          action: 'deleted',
+          dryRun: true,
+        };
+      }
+
+      try {
+        await fs.remove(fullConfigPath);
+        if (verbose) {
+          this.deps.ui.displayInfo(
+            toolDef.displayName,
+            this.deps.t('info.mcp.uninstalled', { tool: toolDef.displayName, path: fullConfigPath })
+          );
+        }
+        return {
+          tool: toolId,
+          toolDisplayName: toolDef.displayName,
+          configPath: fullConfigPath,
+          action: 'deleted',
+          dryRun: false,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.deps.ui.displayError(
+          this.deps.t('errors.mcp.uninstallFailed', { tool: toolDef.displayName }),
+          error as Error
+        );
+        return {
+          tool: toolId,
+          toolDisplayName: toolDef.displayName,
+          configPath: fullConfigPath,
+          action: 'skipped',
+          dryRun: false,
+          error: message,
+        };
+      }
+    }
+
+    const updatedConfig = removal.config ?? existingConfig;
+    const serializedConfig = serializeConfig(updatedConfig);
+
+    if (dryRun) {
+      this.deps.ui.displayInfo(
+        toolDef.displayName,
+        this.deps.t('info.mcp.wouldUninstall', { tool: toolDef.displayName, path: fullConfigPath })
+      );
+      if (verbose) {
+        console.log(serializedConfig);
+      }
+      return {
+        tool: toolId,
+        toolDisplayName: toolDef.displayName,
+        configPath: fullConfigPath,
+        action: 'updated',
+        dryRun: true,
+      };
+    }
+
+    try {
+      await fs.writeFile(fullConfigPath, serializedConfig, 'utf-8');
+
+      if (verbose) {
+        this.deps.ui.displayInfo(
+          toolDef.displayName,
+          this.deps.t('info.mcp.uninstalled', { tool: toolDef.displayName, path: fullConfigPath })
+        );
+      }
+
+      return {
+        tool: toolId,
+        toolDisplayName: toolDef.displayName,
+        configPath: fullConfigPath,
+        action: 'updated',
+        dryRun: false,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.deps.ui.displayError(
+        this.deps.t('errors.mcp.uninstallFailed', { tool: toolDef.displayName }),
+        error as Error
+      );
+      return {
+        tool: toolId,
+        toolDisplayName: toolDef.displayName,
+        configPath: fullConfigPath,
+        action: 'skipped',
+        dryRun: false,
+        error: message,
+      };
+    }
+  }
 }
 
 export function buildMcpInstallToolChoices(
@@ -768,6 +1165,31 @@ export function buildMcpInstallToolChoices(
   return [
     {
       name: t('commands.mcpInstall.allDetected'),
+      value: 'all',
+    },
+    ...orderedTools.map((tool) => ({
+      name: detectedSet.has(tool.id)
+        ? `${tool.displayName} (${t('labels.detected')})`
+        : tool.displayName,
+      value: tool.id,
+    })),
+  ];
+}
+
+export function buildMcpUninstallToolChoices(
+  supportedTools: Array<Pick<ToolDefinition, 'id' | 'displayName'>>,
+  detectedTools: string[],
+  t: TranslateFn
+): MCPInstallToolChoice[] {
+  const detectedSet = new Set(detectedTools);
+  const orderedTools = [
+    ...supportedTools.filter((tool) => detectedSet.has(tool.id)),
+    ...supportedTools.filter((tool) => !detectedSet.has(tool.id)),
+  ];
+
+  return [
+    {
+      name: t('commands.mcpUninstall.allDetected'),
       value: 'all',
     },
     ...orderedTools.map((tool) => ({
@@ -802,5 +1224,31 @@ export async function resolveMcpInstallToolSelection(
   return promptTool({
     message: t('commands.mcpInstall.selectTool'),
     choices: buildMcpInstallToolChoices(supportedTools, detectedTools, t),
+  });
+}
+
+export async function resolveMcpUninstallToolSelection(
+  options: ResolveMcpUninstallToolSelectionOptions
+): Promise<string> {
+  const { selectedTool, isInteractive, service, t, promptTool } = options;
+
+  if (selectedTool) {
+    return selectedTool;
+  }
+
+  if (!isInteractive) {
+    return 'all';
+  }
+
+  if (!promptTool) {
+    throw new Error('Interactive MCP uninstall selection requires a prompt handler.');
+  }
+
+  const supportedTools = service.getSupportedTools();
+  const detectedTools = await service.detectInstalledTools();
+
+  return promptTool({
+    message: t('commands.mcpUninstall.selectTool'),
+    choices: buildMcpUninstallToolChoices(supportedTools, detectedTools, t),
   });
 }

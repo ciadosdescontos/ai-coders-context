@@ -1,73 +1,273 @@
 /**
- * Themed wrappers around @inquirer/prompts that apply the project's promptTheme.
- * The legacy inquirer.prompt() API does not support themes, so these wrappers
- * use @inquirer/prompts directly with the theme pre-applied.
+ * Compatibility wrappers around @clack/prompts.
+ *
+ * The project still emits CommonJS, while @clack/prompts is ESM-only. Keep the
+ * runtime import behind an ESM bridge so compiled output never calls require().
  */
-import { select, confirm, input, password, checkbox, Separator } from '@inquirer/prompts';
-import { promptTheme } from './theme';
+type ClackPrompts = typeof import('@clack/prompts');
+type ClackPromptModule = Pick<
+  ClackPrompts,
+  'select' | 'confirm' | 'text' | 'password' | 'multiselect' | 'isCancel' | 'cancel'
+>;
 
-type Choice<V> = {
-  value: V;
+const importEsm = new Function(
+  'specifier',
+  'return import(specifier)'
+) as (specifier: string) => Promise<ClackPromptModule>;
+
+let clackPromise: Promise<ClackPromptModule> | null = null;
+
+function defaultLoadClack(): Promise<ClackPromptModule> {
+  clackPromise ??= importEsm('@clack/prompts');
+  return clackPromise;
+}
+
+let loadClack = defaultLoadClack;
+
+type PromptChoice<Value> = {
+  value: Value;
   name?: string;
+  label?: string;
   description?: string;
+  hint?: string;
   short?: string;
   disabled?: boolean | string;
+  checked?: boolean;
   type?: never;
 };
 
-export async function themedSelect<V>(config: {
+type PrimitiveChoiceValue = Readonly<string | boolean | number>;
+type ClackPromptOption<Value> = Value extends PrimitiveChoiceValue
+  ? {
+      value: Value;
+      label?: string;
+      hint?: string;
+      disabled?: boolean;
+    }
+  : {
+      value: Value;
+      label: string;
+      hint?: string;
+      disabled?: boolean;
+    };
+
+type LegacyValidateResult = boolean | string;
+type LegacyValidate = (value: string) => LegacyValidateResult | Promise<LegacyValidateResult>;
+type ClackValidate = (value: string | undefined) => string | Error | undefined;
+type SelectOptions<Value> = Parameters<typeof import('@clack/prompts').select<Value>>[0]['options'];
+type MultiselectOptions<Value> = Parameters<typeof import('@clack/prompts').multiselect<Value>>[0]['options'];
+
+export class Separator {
+  readonly type = 'separator';
+
+  constructor(readonly separator = '') {}
+}
+
+export class PromptCancelledError extends Error {
+  constructor() {
+    super('Prompt cancelled');
+    this.name = 'PromptCancelledError';
+    Object.setPrototypeOf(this, PromptCancelledError.prototype);
+  }
+}
+
+export function isPromptCancelled(error: unknown): boolean {
+  return error instanceof PromptCancelledError;
+}
+
+function isSeparator(choice: unknown): choice is Separator {
+  return choice instanceof Separator;
+}
+
+function getChoiceLabel<Value>(choice: PromptChoice<Value>): string {
+  return choice.label ?? choice.name ?? String(choice.value);
+}
+
+function getChoiceHint<Value>(choice: PromptChoice<Value>): string | undefined {
+  const hint = choice.hint ?? choice.description;
+
+  if (typeof choice.disabled !== 'string' || choice.disabled.length === 0) {
+    return hint;
+  }
+
+  return hint ? `${hint} (${choice.disabled})` : choice.disabled;
+}
+
+function mapChoicesToOptions<Value>(
+  choices: ReadonlyArray<PromptChoice<Value> | Separator>
+): ClackPromptOption<Value>[] {
+  return choices.flatMap((choice) => {
+    if (isSeparator(choice)) {
+      return [];
+    }
+
+    const option = {
+      value: choice.value,
+      label: getChoiceLabel(choice),
+    } as ClackPromptOption<Value>;
+    const hint = getChoiceHint(choice);
+
+    if (hint !== undefined) {
+      option.hint = hint;
+    }
+
+    if (Boolean(choice.disabled)) {
+      option.disabled = true;
+    }
+
+    return [option];
+  });
+}
+
+function mapCheckedValues<Value>(
+  choices: ReadonlyArray<PromptChoice<Value> | Separator>
+): Value[] {
+  return choices.flatMap((choice) => {
+    if (isSeparator(choice) || !choice.checked) {
+      return [];
+    }
+
+    return [choice.value];
+  });
+}
+
+function mapValidateResult(result: LegacyValidateResult): string | undefined {
+  if (result === true) {
+    return undefined;
+  }
+
+  if (result === false) {
+    return 'Invalid value';
+  }
+
+  return result;
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === 'function'
+  );
+}
+
+function mapValidate(validate?: LegacyValidate): ClackValidate | undefined {
+  if (!validate) {
+    return undefined;
+  }
+
+  return (value) => {
+    const result = validate(value ?? '');
+
+    if (isPromiseLike(result)) {
+      throw new Error('Async prompt validation is not supported by @clack/prompts');
+    }
+
+    return mapValidateResult(result);
+  };
+}
+
+function unwrapPromptResult<Value>(
+  clack: Pick<ClackPromptModule, 'isCancel' | 'cancel'>,
+  result: Value | symbol
+): Value {
+  if (clack.isCancel(result)) {
+    clack.cancel('Prompt cancelled');
+    throw new PromptCancelledError();
+  }
+
+  return result as Value;
+}
+
+export async function themedSelect<Value>(config: {
   message: string;
-  choices: ReadonlyArray<Separator | Choice<V>>;
+  choices: ReadonlyArray<PromptChoice<Value> | Separator>;
   default?: unknown;
   pageSize?: number;
   loop?: boolean;
-}): Promise<V> {
-  return select<V>({
-    ...config,
-    theme: promptTheme,
+}): Promise<Value> {
+  const clack = await loadClack();
+  const result = await clack.select<Value>({
+    message: config.message,
+    options: mapChoicesToOptions(config.choices) as SelectOptions<Value>,
+    initialValue: config.default as Value | undefined,
+    maxItems: config.pageSize,
   });
+
+  return unwrapPromptResult(clack, result);
 }
 
 export async function themedConfirm(config: {
   message: string;
   default?: boolean;
 }): Promise<boolean> {
-  return confirm({
-    ...config,
-    theme: promptTheme,
+  const clack = await loadClack();
+  const result = await clack.confirm({
+    message: config.message,
+    initialValue: config.default,
   });
+
+  return unwrapPromptResult(clack, result);
 }
 
 export async function themedInput(config: {
   message: string;
   default?: string;
-  validate?: (value: string) => boolean | string | Promise<boolean | string>;
+  validate?: LegacyValidate;
 }): Promise<string> {
-  return input({
-    ...config,
-    theme: promptTheme,
+  const clack = await loadClack();
+  const result = await clack.text({
+    message: config.message,
+    defaultValue: config.default,
+    validate: mapValidate(config.validate),
   });
+
+  return unwrapPromptResult(clack, result);
 }
 
 export async function themedPassword(config: {
   message: string;
   mask?: string;
+  validate?: LegacyValidate;
 }): Promise<string> {
-  return password({
-    ...config,
-    theme: promptTheme,
+  const clack = await loadClack();
+  const result = await clack.password({
+    message: config.message,
+    mask: config.mask,
+    validate: mapValidate(config.validate),
   });
+
+  return unwrapPromptResult(clack, result);
 }
 
-export async function themedCheckbox<V>(config: {
+export async function themedCheckbox<Value>(config: {
   message: string;
-  choices: ReadonlyArray<{ name?: string; value: V; checked?: boolean; disabled?: boolean | string } | Separator>;
+  choices: ReadonlyArray<PromptChoice<Value> | Separator>;
   pageSize?: number;
-}): Promise<V[]> {
-  return checkbox<V>({
-    ...config,
-    theme: promptTheme,
+}): Promise<Value[]> {
+  const clack = await loadClack();
+  const result = await clack.multiselect<Value>({
+    message: config.message,
+    options: mapChoicesToOptions(config.choices) as MultiselectOptions<Value>,
+    initialValues: mapCheckedValues(config.choices),
+    maxItems: config.pageSize,
+    required: false,
   });
+
+  return unwrapPromptResult(clack, result);
 }
 
-export { Separator };
+export const themedPromptTestHooks = {
+  setClackModule(module: ClackPromptModule): void {
+    clackPromise = null;
+    loadClack = async () => module;
+  },
+  resetClackModule(): void {
+    clackPromise = null;
+    loadClack = defaultLoadClack;
+  },
+  mapChoicesToOptions,
+  mapCheckedValues,
+  mapValidateResult,
+  unwrapPromptResult,
+};

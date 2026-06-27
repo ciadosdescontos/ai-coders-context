@@ -256,6 +256,9 @@ npx -y @dotcontext/cli@latest mcp:install codex --with-hooks --hook-format toml
 
 # MCP only, without hook recommendation output
 npx -y @dotcontext/cli@latest mcp:install codex --no-hooks
+
+# Remove dotcontext MCP config
+npx -y @dotcontext/cli@latest mcp:uninstall codex --dry-run
 ```
 
 ### Supported MCP Install Targets
@@ -460,6 +463,12 @@ pi install npm:pi-mcp-adapter
 
 When Pi hooks are installed from `mcp:install pi --with-hooks`, the MCP installer has already written the MCP config, so the Pi hook step should not add a second `.mcp.json` snippet.
 
+To remove the Pi extension, use the canonical Pi command:
+
+```bash
+pi uninstall @dotcontext/pi
+```
+
 ### Local Development MCP Config
 
 For local development, build first and point directly to the dedicated MCP binary:
@@ -521,9 +530,10 @@ For AI-agent use, provide `repoPath` on the first context-heavy MCP call so dotc
 
 | Command | Purpose |
 | --- | --- |
-| `npx -y @dotcontext/cli@latest` | Launch the interactive CLI, including quick sync |
+| `npx -y @dotcontext/cli@latest` | Launch the interactive CLI with Synchronize my context, Import my context, Integrations, Settings, and Exit |
 | `npx @dotcontext/mcp install` | Install MCP configuration for supported AI tools |
 | `npx -y @dotcontext/cli@latest mcp:install [tool] --with-hooks` | Install MCP config and eligible recommended hooks for Claude Code, Codex CLI, or Pi |
+| `npx -y @dotcontext/cli@latest mcp:uninstall [tool]` | Remove dotcontext MCP config while preserving unrelated client config |
 | `npx -y @dotcontext/cli@latest hook install [host]` | Install lifecycle hooks for Claude Code, Codex CLI, or Pi |
 | `npx -y @dotcontext/cli@latest hook doctor codex` | Diagnose Codex hook config, trust prerequisites, traces, and runtime state |
 | `npx -y @dotcontext/cli@latest hook uninstall [host]` | Remove dotcontext hook entries |

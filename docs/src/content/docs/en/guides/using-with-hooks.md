@@ -159,9 +159,10 @@ Remove dotcontext hook entries without touching unrelated config:
 ```bash
 npx -y @dotcontext/cli@latest hook uninstall claude-code
 npx -y @dotcontext/cli@latest hook uninstall codex --format toml
+npx -y @dotcontext/cli@latest hook uninstall pi
 ```
 
-Use `--dry-run` to preview removals first.
+Use `--dry-run` to preview removals first. For Pi, uninstall prints extension removal guidance with `pi uninstall @dotcontext/pi`.
 
 ## Advanced: explicit dispatch
 

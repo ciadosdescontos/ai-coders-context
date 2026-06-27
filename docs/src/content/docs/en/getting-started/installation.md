@@ -187,7 +187,7 @@ Run it on demand with no install:
 npx -y @dotcontext/cli@latest
 ```
 
-Running it with no arguments opens an interactive, guided menu that detects your project state (new, unfilled, or up to date) and offers Quick Sync, Reverse Sync, MCP Install, and Settings.
+Running it with no arguments opens an interactive, guided menu that detects your project state (new, unfilled, or up to date) and offers **Synchronize my context**, **Import my context**, **Integrations**, and **Settings**. The **Integrations** submenu includes Install/Uninstall MCP, Install/Uninstall Hooks, Install/Uninstall Pi Extension, and Back.
 
 You can also run any command directly:
 
@@ -213,7 +213,7 @@ The CLI surface covers:
 - `import-rules` / `import-agents` — bring external rules and agents into `.context/`
 - `reverse-sync` — scan AI tool directories and import rules, agents, and skills back into `.context/`
 - `export-rules` — distribute `.context/docs/` rules out to AI tools
-- `mcp` / `mcp:install` — start the MCP server or configure it for AI clients
+- `mcp` / `mcp:install` / `mcp:uninstall` — start the MCP server or manage its AI-client config
 - `hook install` / `hook uninstall` — wire lifecycle hooks for Claude Code, Codex CLI, or Pi
 - `admin` — low-level workflow state, skill export, and reports
 

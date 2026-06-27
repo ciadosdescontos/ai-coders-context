@@ -107,7 +107,7 @@ Remove the Pi extension:
 pi uninstall @dotcontext/pi
 ```
 
-Remove MCP entries from `.mcp.json` manually or re-run `npx @dotcontext/mcp install` after editing the file.
+The CLI interactive **Integrations** menu also exposes **Uninstall Pi Extension** and can offer Pi MCP cleanup through `dotcontext mcp:uninstall pi --local`.
 
 ## For extension authors
 

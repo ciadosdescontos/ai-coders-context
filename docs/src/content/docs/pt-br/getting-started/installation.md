@@ -181,7 +181,7 @@ Rode sob demanda, sem instalar:
 npx -y @dotcontext/cli@latest
 ```
 
-Executar sem argumentos abre um menu interativo e guiado que detecta o estado do projeto (novo, não preenchido ou atualizado) e oferece Quick Sync, Reverse Sync, MCP Install e Settings.
+Executar sem argumentos abre um menu interativo e guiado que detecta o estado do projeto (novo, não preenchido ou atualizado) e oferece **Synchronize my context**, **Import my context**, **Integrações** e **Configurações**. O submenu **Integrações** inclui instalar/desinstalar MCP, instalar/desinstalar hooks, instalar/desinstalar a extensão Pi e voltar.
 
 Você também pode rodar qualquer comando diretamente:
 
@@ -207,7 +207,7 @@ A superfície da CLI cobre:
 - `import-rules` / `import-agents` — traz rules e agents externos para o `.context/`
 - `reverse-sync` — varre os diretórios das ferramentas de IA e importa rules, agents e skills de volta para o `.context/`
 - `export-rules` — distribui as rules de `.context/docs/` para as ferramentas de IA
-- `mcp` / `mcp:install` — inicia o servidor MCP ou o configura para clientes de IA
+- `mcp` / `mcp:install` / `mcp:uninstall` — inicia o servidor MCP ou gerencia sua configuração em clientes de IA
 - `hook install` / `hook uninstall` — configura hooks de ciclo de vida para Claude Code, Codex CLI ou Pi
 - `admin` — estado de workflow de baixo nível, export de skills e relatórios
 

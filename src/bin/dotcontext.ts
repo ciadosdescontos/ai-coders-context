@@ -2,7 +2,6 @@
 
 import { Command } from 'commander';
 import * as path from 'path';
-import inquirer from 'inquirer';
 
 import { colors, typography } from '../utils/theme';
 import {
@@ -10,7 +9,13 @@ import {
   packageNameToDisplayName,
   renderSplashScreen
 } from '../utils/splashScreen';
-import { themedCheckbox, themedConfirm, themedSelect, Separator } from '../utils/themedPrompt';
+import {
+  isPromptCancelled,
+  themedCheckbox,
+  themedConfirm,
+  themedInput,
+  themedSelect,
+} from '../utils/themedPrompt';
 import { CLIInterface } from '../utils/cliUI';
 import { checkForUpdates } from '../utils/versionChecker';
 import { registerProcessShutdown } from '../utils/processShutdown';
@@ -19,6 +24,7 @@ import type { TranslateFn, Locale, TranslationKey } from '../utils/i18n';
 import {
   MCPInstallService,
   resolveMcpInstallToolSelection,
+  resolveMcpUninstallToolSelection,
   buildHookInstallCommand,
   getAvailableRecommendedHookTargets,
   getMcpHookRecommendationDecision,
@@ -303,6 +309,21 @@ interface RunMcpInstallFlowOptions {
   showInteractiveIntro?: boolean;
 }
 
+interface McpUninstallCommandOptions {
+  global: boolean;
+  local?: boolean;
+  dryRun?: boolean;
+  verbose?: boolean;
+}
+
+interface RunMcpUninstallFlowOptions {
+  selectedToolArg?: string;
+  isInteractive: boolean;
+  mcpGlobal: boolean;
+  dryRun: boolean;
+  verbose: boolean;
+}
+
 function parseMcpInstallHookOptions(options: McpInstallCommandOptions): Pick<
   RunMcpInstallFlowOptions,
   'withHooks' | 'noHooks' | 'hookFormat'
@@ -496,6 +517,25 @@ async function runMcpInstallFlow(options: RunMcpInstallFlowOptions): Promise<voi
   await installRecommendedHooks(selectedTargets, options);
 }
 
+async function runMcpUninstallFlow(options: RunMcpUninstallFlowOptions): Promise<void> {
+  const mcpInstallService = new MCPInstallService({ ui, t, version: VERSION });
+  const selectedTool = await resolveMcpUninstallToolSelection({
+    selectedTool: options.selectedToolArg,
+    isInteractive: options.isInteractive,
+    service: mcpInstallService,
+    t,
+    promptTool: ({ message, choices }) => themedSelect({ message, choices }),
+  });
+
+  await mcpInstallService.runUninstall({
+    tool: selectedTool,
+    global: options.mcpGlobal,
+    dryRun: options.dryRun,
+    verbose: options.verbose,
+    repoPath: process.cwd(),
+  });
+}
+
 // MCP Install Command
 program
   .command('mcp:install [tool]')
@@ -524,6 +564,28 @@ program
       } else {
         ui.displayError(t('errors.mcp.installFailed', { tool: tool || 'unknown' }), error as Error);
       }
+      process.exit(1);
+    }
+  });
+
+program
+  .command('mcp:uninstall [tool]')
+  .description(t('commands.mcpUninstall.description'))
+  .option('-g, --global', t('commands.mcpUninstall.options.global'), true)
+  .option('-l, --local', t('commands.mcpUninstall.options.local'))
+  .option('--dry-run', t('commands.mcpUninstall.options.dryRun'))
+  .option('-v, --verbose', t('commands.mcpUninstall.options.verbose'))
+  .action(async (tool: string | undefined, options: McpUninstallCommandOptions) => {
+    try {
+      await runMcpUninstallFlow({
+        selectedToolArg: tool,
+        isInteractive: Boolean(process.stdin.isTTY),
+        mcpGlobal: options.local ? false : options.global,
+        dryRun: Boolean(options.dryRun),
+        verbose: Boolean(options.verbose),
+      });
+    } catch (error) {
+      ui.displayError(t('errors.mcp.uninstallFailed', { tool: tool || 'unknown' }), error as Error);
       process.exit(1);
     }
   });
@@ -1059,8 +1121,16 @@ async function selectLocale(): Promise<void> {
   translateFn = createTranslator(normalizedLocale);
 }
 
-type InteractiveAction = 'syncAgents' | 'update' | 'changeLanguage' | 'exit' | 'quickSync' | 'reverseSync' | 'settings' | 'mcpInstall' | 'viewPending';
-type StateAction = 'exit' | 'mcpInstall' | 'reverseSync' | 'settings';
+type InteractiveAction = 'syncAgents' | 'update' | 'changeLanguage' | 'exit' | 'quickSync' | 'reverseSync' | 'settings' | 'integrations' | 'viewPending';
+type StateAction = 'exit' | 'integrations' | 'reverseSync' | 'settings';
+type IntegrationAction =
+  | 'installMcp'
+  | 'uninstallMcp'
+  | 'installHooks'
+  | 'uninstallHooks'
+  | 'installPiExtension'
+  | 'uninstallPiExtension'
+  | 'back';
 
 async function runInteractive(): Promise<void> {
   const projectPath = process.cwd();
@@ -1127,15 +1197,15 @@ async function runInteractive(): Promise<void> {
     const action = await themedSelect<StateAction>({
       message: t('prompts.main.action'),
       choices: [
-        { name: t('prompts.main.choice.mcpInstall'), value: 'mcpInstall' },
+        { name: t('prompts.main.choice.integrations'), value: 'integrations' },
         { name: t('prompts.main.choice.reverseSync'), value: 'reverseSync' },
         { name: t('prompts.main.choice.settings'), value: 'settings' },
         { name: t('prompts.main.choice.exit'), value: 'exit' }
       ]
     });
 
-    if (action === 'mcpInstall') {
-      await runMcpInstall();
+    if (action === 'integrations') {
+      await runIntegrationsMenu();
     } else if (action === 'reverseSync') {
       await runReverseSync();
     } else if (action === 'settings') {
@@ -1163,17 +1233,16 @@ async function runFullMenu(): Promise<void> {
     const choices = isUnfilled
       ? [
         { name: t('prompts.main.choice.viewPending'), value: 'viewPending' as InteractiveAction },
-        { name: t('prompts.main.choice.mcpInstall'), value: 'mcpInstall' as InteractiveAction },
-        new Separator(),
         { name: t('prompts.main.choice.quickSync'), value: 'quickSync' as InteractiveAction },
         { name: t('prompts.main.choice.reverseSync'), value: 'reverseSync' as InteractiveAction },
+        { name: t('prompts.main.choice.integrations'), value: 'integrations' as InteractiveAction },
         { name: t('prompts.main.choice.settings'), value: 'settings' as InteractiveAction },
         { name: t('prompts.main.choice.exit'), value: 'exit' as InteractiveAction }
       ]
       : [
         { name: t('prompts.main.choice.quickSync'), value: 'quickSync' as InteractiveAction },
         { name: t('prompts.main.choice.reverseSync'), value: 'reverseSync' as InteractiveAction },
-        { name: t('prompts.main.choice.mcpInstall'), value: 'mcpInstall' as InteractiveAction },
+        { name: t('prompts.main.choice.integrations'), value: 'integrations' as InteractiveAction },
         { name: t('prompts.main.choice.settings'), value: 'settings' as InteractiveAction },
         { name: t('prompts.main.choice.exit'), value: 'exit' as InteractiveAction }
       ];
@@ -1199,8 +1268,8 @@ async function runFullMenu(): Promise<void> {
       await runQuickSync();
     } else if (action === 'reverseSync') {
       await runReverseSync();
-    } else if (action === 'mcpInstall') {
-      await runMcpInstall();
+    } else if (action === 'integrations') {
+      await runIntegrationsMenu();
     } else if (action === 'settings') {
       await runSettings();
     }
@@ -1235,25 +1304,147 @@ async function runMcpInstall(): Promise<void> {
   });
 }
 
+async function runMcpUninstall(): Promise<void> {
+  await runMcpUninstallFlow({
+    isInteractive: true,
+    mcpGlobal: true,
+    dryRun: false,
+    verbose: false,
+  });
+}
+
+async function selectCodexHookFormatWhenNeeded(host: string): Promise<RecommendedHookFormat> {
+  if (host !== 'codex' && host !== 'all') {
+    return 'json';
+  }
+
+  return themedSelect<RecommendedHookFormat>({
+    message: t('prompts.integrations.codexHookFormat'),
+    default: 'json',
+    choices: [
+      { name: 'JSON (.codex/hooks.json)', value: 'json' },
+      { name: 'TOML (.codex/config.toml)', value: 'toml' },
+    ],
+  });
+}
+
+async function runHookInstallFlow(selectedHost?: string): Promise<void> {
+  const hookInstallService = new HookInstallService({ ui, t, version: VERSION });
+  const host = await resolveHookInstallHostSelection({
+    selectedHost,
+    isInteractive: true,
+    service: hookInstallService,
+    t,
+    promptHost: ({ message, choices }) => themedSelect({ message, choices }),
+  });
+  const format = await selectCodexHookFormatWhenNeeded(host);
+
+  await hookInstallService.runInstall({
+    host,
+    global: false,
+    dryRun: false,
+    verbose: false,
+    format,
+    repoPath: process.cwd(),
+  });
+}
+
+async function runHookUninstallFlow(selectedHost?: string): Promise<void> {
+  const hookInstallService = new HookInstallService({ ui, t, version: VERSION });
+  const host = await resolveHookInstallHostSelection({
+    selectedHost,
+    isInteractive: true,
+    service: hookInstallService,
+    t,
+    promptHost: ({ message, choices }) => themedSelect({ message, choices }),
+  });
+  const format = await selectCodexHookFormatWhenNeeded(host);
+
+  await hookInstallService.runUninstall({
+    host,
+    global: false,
+    dryRun: false,
+    verbose: false,
+    format,
+    repoPath: process.cwd(),
+  });
+}
+
+async function runPiExtensionInstall(): Promise<void> {
+  await runHookInstallFlow('pi');
+}
+
+async function runPiExtensionUninstall(): Promise<void> {
+  await runHookUninstallFlow('pi');
+
+  const removeMcp = await themedConfirm({
+    message: t('prompts.integrations.removePiMcp'),
+    default: true,
+  });
+
+  if (!removeMcp) {
+    return;
+  }
+
+  await runMcpUninstallFlow({
+    selectedToolArg: 'pi',
+    isInteractive: false,
+    mcpGlobal: false,
+    dryRun: false,
+    verbose: false,
+  });
+}
+
+async function runIntegrationsMenu(): Promise<void> {
+  let backRequested = false;
+
+  while (!backRequested) {
+    const action = await themedSelect<IntegrationAction>({
+      message: t('prompts.integrations.action'),
+      choices: [
+        { name: t('prompts.integrations.choice.installMcp'), value: 'installMcp' },
+        { name: t('prompts.integrations.choice.uninstallMcp'), value: 'uninstallMcp' },
+        { name: t('prompts.integrations.choice.installHooks'), value: 'installHooks' },
+        { name: t('prompts.integrations.choice.uninstallHooks'), value: 'uninstallHooks' },
+        { name: t('prompts.integrations.choice.installPiExtension'), value: 'installPiExtension' },
+        { name: t('prompts.integrations.choice.uninstallPiExtension'), value: 'uninstallPiExtension' },
+        { name: t('prompts.integrations.choice.back'), value: 'back' },
+      ],
+    });
+
+    if (action === 'back') {
+      backRequested = true;
+    } else if (action === 'installMcp') {
+      await runMcpInstall();
+    } else if (action === 'uninstallMcp') {
+      await runMcpUninstall();
+    } else if (action === 'installHooks') {
+      await runHookInstallFlow();
+    } else if (action === 'uninstallHooks') {
+      await runHookUninstallFlow();
+    } else if (action === 'installPiExtension') {
+      await runPiExtensionInstall();
+    } else if (action === 'uninstallPiExtension') {
+      await runPiExtensionUninstall();
+    }
+  }
+}
+
 async function runInteractiveSync(): Promise<void> {
   const defaults = await detectSmartDefaults();
   const defaultSource = path.resolve(defaults.repoPath, '.context/agents');
 
   // Simplified: single prompt for target selection with common presets
-  const { quickTarget } = await inquirer.prompt<{ quickTarget: string }>([
-    {
-      type: 'list',
-      name: 'quickTarget',
-      message: t('prompts.sync.quickTarget'),
-      choices: [
-        { name: t('prompts.sync.quickTarget.common'), value: 'common' },
-        { name: t('prompts.sync.quickTarget.claude'), value: 'claude' },
-        { name: t('prompts.sync.quickTarget.all'), value: 'all' },
-        { name: t('prompts.sync.quickTarget.custom'), value: 'custom' }
-      ],
-      default: 'common'
-    }
-  ]);
+  const quickTarget = await themedSelect<string>({
+    message: t('prompts.sync.quickTarget'),
+    choices: [
+      { name: t('prompts.sync.quickTarget.common'), value: 'common' },
+      { name: t('prompts.sync.quickTarget.claude'), value: 'claude' },
+      { name: t('prompts.sync.quickTarget.all'), value: 'all' },
+      { name: t('prompts.sync.quickTarget.custom'), value: 'custom' }
+    ],
+    default: 'common'
+  });
 
   let preset: string | undefined;
   let target: string[] | undefined;
@@ -1261,21 +1452,13 @@ async function runInteractiveSync(): Promise<void> {
 
   if (quickTarget === 'custom') {
     // Custom path: ask for source and target
-    const answers = await inquirer.prompt<{ sourcePath: string; customPath: string }>([
-      {
-        type: 'input',
-        name: 'sourcePath',
-        message: t('prompts.sync.source'),
-        default: defaultSource
-      },
-      {
-        type: 'input',
-        name: 'customPath',
-        message: t('prompts.sync.customPath')
-      }
-    ]);
-    sourcePath = answers.sourcePath;
-    target = [answers.customPath];
+    sourcePath = await themedInput({
+      message: t('prompts.sync.source'),
+      default: defaultSource
+    });
+    target = [await themedInput({
+      message: t('prompts.sync.customPath')
+    })];
   } else if (quickTarget === 'common') {
     // Common: Claude + GitHub - use explicit target paths instead of preset
     target = [
@@ -1314,25 +1497,21 @@ async function runInteractiveSync(): Promise<void> {
 
 
 // ============================================================================
-// Quick Sync - Unified sync for agents, skills, and docs
+// Synchronize my context - unified sync for agents, skills, and docs
 // ============================================================================
 
 async function runQuickSync(): Promise<void> {
   const projectPath = process.cwd();
 
   // Single prompt: sync all or customize?
-  const { syncMode } = await inquirer.prompt<{ syncMode: string }>([
-    {
-      type: 'list',
-      name: 'syncMode',
-      message: t('prompts.quickSync.mode'),
-      choices: [
-        { name: t('prompts.quickSync.mode.syncAll'), value: 'all' },
-        { name: t('prompts.quickSync.mode.customize'), value: 'customize' },
-        { name: t('prompts.quickSync.mode.cancel'), value: 'cancel' },
-      ],
-    },
-  ]);
+  const syncMode = await themedSelect<string>({
+    message: t('prompts.quickSync.mode'),
+    choices: [
+      { name: t('prompts.quickSync.mode.syncAll'), value: 'all' },
+      { name: t('prompts.quickSync.mode.customize'), value: 'customize' },
+      { name: t('prompts.quickSync.mode.cancel'), value: 'cancel' },
+    ],
+  });
 
   if (syncMode === 'cancel') return;
 
@@ -1353,18 +1532,14 @@ async function runQuickSync(): Promise<void> {
     };
   } else {
     // Customize: show the existing checkbox prompts
-    const { components } = await inquirer.prompt<{ components: string[] }>([
-      {
-        type: 'checkbox',
-        name: 'components',
-        message: t('prompts.quickSync.selectComponents'),
-        choices: [
-          { name: t('prompts.quickSync.components.agents'), value: 'agents', checked: true },
-          { name: t('prompts.quickSync.components.skills'), value: 'skills', checked: true },
-          { name: t('prompts.quickSync.components.docs'), value: 'docs', checked: true },
-        ],
-      },
-    ]);
+    const components = await themedCheckbox<string>({
+      message: t('prompts.quickSync.selectComponents'),
+      choices: [
+        { name: t('prompts.quickSync.components.agents'), value: 'agents', checked: true },
+        { name: t('prompts.quickSync.components.skills'), value: 'skills', checked: true },
+        { name: t('prompts.quickSync.components.docs'), value: 'docs', checked: true },
+      ],
+    });
 
     if (components.length === 0) {
       ui.displayWarning(t('prompts.quickSync.noComponentsSelected'));
@@ -1376,61 +1551,49 @@ async function runQuickSync(): Promise<void> {
     let docTargets: string[] | undefined;
 
     if (components.includes('agents')) {
-      const { targets } = await inquirer.prompt<{ targets: string[] }>([
-        {
-          type: 'checkbox',
-          name: 'targets',
-          message: t('prompts.quickSync.selectAgentTargets'),
-          choices: [
-            { name: '.claude/agents (Claude Code)', value: 'claude', checked: true },
-            { name: '.github/agents (GitHub Copilot)', value: 'github', checked: true },
-            { name: '.cursor/agents (Cursor AI)', value: 'cursor', checked: false },
-            { name: '.windsurf/agents (Windsurf/Codeium)', value: 'windsurf', checked: false },
-            { name: '.cline/agents (Cline)', value: 'cline', checked: false },
-            { name: '.continue/agents (Continue.dev)', value: 'continue', checked: false },
-          ],
-        },
-      ]);
+      const targets = await themedCheckbox<string>({
+        message: t('prompts.quickSync.selectAgentTargets'),
+        choices: [
+          { name: '.claude/agents (Claude Code)', value: 'claude', checked: true },
+          { name: '.github/agents (GitHub Copilot)', value: 'github', checked: true },
+          { name: '.cursor/agents (Cursor AI)', value: 'cursor', checked: false },
+          { name: '.windsurf/agents (Windsurf/Codeium)', value: 'windsurf', checked: false },
+          { name: '.cline/agents (Cline)', value: 'cline', checked: false },
+          { name: '.continue/agents (Continue.dev)', value: 'continue', checked: false },
+        ],
+      });
       agentTargets = targets.length > 0 ? targets : undefined;
     }
 
     if (components.includes('skills')) {
-      const { targets } = await inquirer.prompt<{ targets: string[] }>([
-        {
-          type: 'checkbox',
-          name: 'targets',
-          message: t('prompts.quickSync.selectSkillTargets'),
-          choices: [
-            { name: '.claude/skills (Claude Code)', value: 'claude', checked: true },
-            { name: '.github/skills (GitHub Copilot)', value: 'github', checked: true },
-            { name: '.windsurf/skills (Windsurf)', value: 'windsurf', checked: true },
-            { name: '.codex/skills (Codex compatibility)', value: 'codex', checked: true },
-            { name: '.agents/workflows (Google Antigravity)', value: 'antigravity', checked: true },
-            { name: '.gemini/skills (Gemini compatibility)', value: 'gemini', checked: false },
-          ],
-        },
-      ]);
+      const targets = await themedCheckbox<string>({
+        message: t('prompts.quickSync.selectSkillTargets'),
+        choices: [
+          { name: '.claude/skills (Claude Code)', value: 'claude', checked: true },
+          { name: '.github/skills (GitHub Copilot)', value: 'github', checked: true },
+          { name: '.windsurf/skills (Windsurf)', value: 'windsurf', checked: true },
+          { name: '.codex/skills (Codex compatibility)', value: 'codex', checked: true },
+          { name: '.agents/workflows (Google Antigravity)', value: 'antigravity', checked: true },
+          { name: '.gemini/skills (Gemini compatibility)', value: 'gemini', checked: false },
+        ],
+      });
       skillTargets = targets.length > 0 ? targets : undefined;
     }
 
     if (components.includes('docs')) {
-      const { targets } = await inquirer.prompt<{ targets: string[] }>([
-        {
-          type: 'checkbox',
-          name: 'targets',
-          message: t('prompts.quickSync.selectDocTargets'),
-          choices: [
-            { name: '.cursor/rules (Cursor AI)', value: 'cursor', checked: true },
-            { name: 'CLAUDE.md (Claude Code)', value: 'claude', checked: true },
-            { name: '.github/copilot-instructions.md (GitHub Copilot)', value: 'github', checked: true },
-            { name: 'GEMINI.md (Gemini CLI)', value: 'gemini', checked: true },
-            { name: 'AGENTS.md (Universal)', value: 'agents', checked: true },
-            { name: '.windsurf/rules (Windsurf)', value: 'windsurf', checked: false },
-            { name: '.clinerules (Cline)', value: 'cline', checked: false },
-            { name: 'CONVENTIONS.md (Aider)', value: 'aider', checked: false },
-          ],
-        },
-      ]);
+      const targets = await themedCheckbox<string>({
+        message: t('prompts.quickSync.selectDocTargets'),
+        choices: [
+          { name: '.cursor/rules (Cursor AI)', value: 'cursor', checked: true },
+          { name: 'CLAUDE.md (Claude Code)', value: 'claude', checked: true },
+          { name: '.github/copilot-instructions.md (GitHub Copilot)', value: 'github', checked: true },
+          { name: 'GEMINI.md (Gemini CLI)', value: 'gemini', checked: true },
+          { name: 'AGENTS.md (Universal)', value: 'agents', checked: true },
+          { name: '.windsurf/rules (Windsurf)', value: 'windsurf', checked: false },
+          { name: '.clinerules (Cline)', value: 'cline', checked: false },
+          { name: 'CONVENTIONS.md (Aider)', value: 'aider', checked: false },
+        ],
+      });
       docTargets = targets.length > 0 ? targets : undefined;
     }
 
@@ -1459,7 +1622,7 @@ async function runQuickSync(): Promise<void> {
 }
 
 // ============================================================================
-// Reverse Quick Sync - Import from AI tool directories
+// Import my context - import from AI tool directories
 // ============================================================================
 
 async function runReverseSync(): Promise<void> {
@@ -1498,33 +1661,29 @@ async function runReverseSync(): Promise<void> {
   console.log('');
 
   // Step 2: Select components to import
-  const { components } = await inquirer.prompt<{ components: string[] }>([
-    {
-      type: 'checkbox',
-      name: 'components',
-      message: t('prompts.reverseSync.selectComponents'),
-      choices: [
-        {
-          name: `Rules (${detection.summary.totalRules} files)`,
-          value: 'rules',
-          checked: detection.summary.totalRules > 0,
-          disabled: detection.summary.totalRules === 0,
-        },
-        {
-          name: `Agents (${detection.summary.totalAgents} files)`,
-          value: 'agents',
-          checked: detection.summary.totalAgents > 0,
-          disabled: detection.summary.totalAgents === 0,
-        },
-        {
-          name: `Skills (${detection.summary.totalSkills} files)`,
-          value: 'skills',
-          checked: detection.summary.totalSkills > 0,
-          disabled: detection.summary.totalSkills === 0,
-        },
-      ],
-    },
-  ]);
+  const components = await themedCheckbox<string>({
+    message: t('prompts.reverseSync.selectComponents'),
+    choices: [
+      {
+        name: `Rules (${detection.summary.totalRules} files)`,
+        value: 'rules',
+        checked: detection.summary.totalRules > 0,
+        disabled: detection.summary.totalRules === 0,
+      },
+      {
+        name: `Agents (${detection.summary.totalAgents} files)`,
+        value: 'agents',
+        checked: detection.summary.totalAgents > 0,
+        disabled: detection.summary.totalAgents === 0,
+      },
+      {
+        name: `Skills (${detection.summary.totalSkills} files)`,
+        value: 'skills',
+        checked: detection.summary.totalSkills > 0,
+        disabled: detection.summary.totalSkills === 0,
+      },
+    ],
+  });
 
   if (components.length === 0) {
     ui.displayWarning(t('prompts.reverseSync.noComponentsSelected'));
@@ -1532,19 +1691,15 @@ async function runReverseSync(): Promise<void> {
   }
 
   // Step 3: Select merge strategy
-  const { mergeStrategy } = await inquirer.prompt<{ mergeStrategy: MergeStrategy }>([
-    {
-      type: 'list',
-      name: 'mergeStrategy',
-      message: t('prompts.reverseSync.mergeStrategy'),
-      choices: [
-        { name: t('prompts.reverseSync.strategy.skip'), value: 'skip' },
-        { name: t('prompts.reverseSync.strategy.overwrite'), value: 'overwrite' },
-        { name: t('prompts.reverseSync.strategy.merge'), value: 'merge' },
-        { name: t('prompts.reverseSync.strategy.rename'), value: 'rename' },
-      ],
-    },
-  ]);
+  const mergeStrategy = await themedSelect<MergeStrategy>({
+    message: t('prompts.reverseSync.mergeStrategy'),
+    choices: [
+      { name: t('prompts.reverseSync.strategy.skip'), value: 'skip' },
+      { name: t('prompts.reverseSync.strategy.overwrite'), value: 'overwrite' },
+      { name: t('prompts.reverseSync.strategy.merge'), value: 'merge' },
+      { name: t('prompts.reverseSync.strategy.rename'), value: 'rename' },
+    ],
+  });
 
   // Step 4: Run import
   const result = await reverseSyncService.run(projectPath, {
@@ -1621,8 +1776,12 @@ export async function runDotcontextCli(): Promise<void> {
  * Check if an error is from user interrupt (Ctrl+C)
  */
 function isUserInterrupt(error: unknown): boolean {
+  if (isPromptCancelled(error)) {
+    return true;
+  }
+
   if (error instanceof Error) {
-    // Inquirer's ExitPromptError when user presses Ctrl+C
+    // Prompt libraries throw their own interruption errors when user presses Ctrl+C.
     if (error.name === 'ExitPromptError') return true;
     // Check message patterns
     if (error.message.includes('force closed')) return true;

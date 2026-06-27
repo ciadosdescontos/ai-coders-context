@@ -4,7 +4,9 @@ import * as fs from 'fs-extra';
 import {
   MCPInstallService,
   buildMcpInstallToolChoices,
+  buildMcpUninstallToolChoices,
   resolveMcpInstallToolSelection,
+  resolveMcpUninstallToolSelection,
 } from '../mcpInstallService';
 import type { CLIInterface } from '../../../utils/cliUI';
 
@@ -143,6 +145,56 @@ describe('MCPInstallService', () => {
       });
 
       detectSpy.mockRestore();
+    });
+  });
+
+  describe('resolveMcpUninstallToolSelection', () => {
+    it('uses uninstall-specific detected-first tool choices for uninstall prompts', async () => {
+      const promptTool = jest.fn().mockResolvedValue('codex');
+      const detectSpy = jest.spyOn(service, 'detectInstalledTools').mockResolvedValue(['codex']);
+
+      const choices = buildMcpUninstallToolChoices(
+        [
+          { id: 'claude', displayName: 'Claude Code' },
+          { id: 'codex', displayName: 'Codex CLI' },
+        ],
+        ['codex'],
+        mockT as any
+      );
+
+      expect(choices).toEqual([
+        { name: 'commands.mcpUninstall.allDetected', value: 'all' },
+        { name: 'Codex CLI (labels.detected)', value: 'codex' },
+        { name: 'Claude Code', value: 'claude' },
+      ]);
+
+      const selectedTool = await resolveMcpUninstallToolSelection({
+        isInteractive: true,
+        service,
+        t: mockT as any,
+        promptTool,
+      });
+
+      expect(selectedTool).toBe('codex');
+      expect(promptTool).toHaveBeenCalledWith({
+        message: 'commands.mcpUninstall.selectTool',
+        choices: expect.arrayContaining([
+          { name: 'commands.mcpUninstall.allDetected', value: 'all' },
+          { name: 'Codex CLI (labels.detected)', value: 'codex' },
+        ]),
+      });
+
+      detectSpy.mockRestore();
+    });
+
+    it('defaults to all in non-interactive uninstall mode', async () => {
+      const selectedTool = await resolveMcpUninstallToolSelection({
+        isInteractive: false,
+        service,
+        t: mockT as any,
+      });
+
+      expect(selectedTool).toBe('all');
     });
   });
 
@@ -689,6 +741,239 @@ describe('MCPInstallService', () => {
       expect(config.mcpServers['dotcontext']).toBeDefined();
       expect(config.mcpServers['dotcontext'].command).toBe('npx');
       expect(config.mcpServers['dotcontext'].args).toEqual(['-y', '@dotcontext/mcp@latest']);
+    });
+  });
+
+  describe('runUninstall', () => {
+    it('removes only dotcontext from a shared mcpServers config and preserves other keys', async () => {
+      const configPath = path.join(tempDir, '.mcp.json');
+      await fs.writeJson(configPath, {
+        version: 1,
+        mcpServers: {
+          dotcontext: { command: 'npx', args: ['-y', '@dotcontext/mcp@latest'] },
+          'other-server': { command: 'other', args: ['--flag'] },
+        },
+        unrelated: { enabled: true },
+      });
+
+      const result = await service.runUninstall({
+        tool: 'claude',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      expect(result.filesCreated).toBe(1);
+      expect(result.uninstallations).toEqual([
+        expect.objectContaining({
+          tool: 'claude',
+          action: 'updated',
+          dryRun: false,
+        }),
+      ]);
+
+      const config = await fs.readJson(configPath);
+      expect(config.mcpServers.dotcontext).toBeUndefined();
+      expect(config.mcpServers['other-server']).toEqual({ command: 'other', args: ['--flag'] });
+      expect(config.unrelated).toEqual({ enabled: true });
+      expect(await fs.pathExists(configPath)).toBe(true);
+    });
+
+    it('removes Pi local dotcontext config from .mcp.json and preserves other MCP servers', async () => {
+      const configPath = path.join(tempDir, '.mcp.json');
+      await fs.writeJson(configPath, {
+        mcpServers: {
+          dotcontext: { command: 'npx', args: ['-y', '@dotcontext/mcp@latest'] },
+          piHelper: { command: 'pi-helper', args: [] },
+        },
+      });
+
+      const result = await service.runUninstall({
+        tool: 'pi',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      expect(result.filesCreated).toBe(1);
+
+      const config = await fs.readJson(configPath);
+      expect(config.mcpServers.dotcontext).toBeUndefined();
+      expect(config.mcpServers.piHelper).toEqual({ command: 'pi-helper', args: [] });
+    });
+
+    it('removes only dotcontext from VS Code servers config', async () => {
+      const configPath = path.join(tempDir, '.vscode', 'mcp.json');
+      await fs.ensureDir(path.dirname(configPath));
+      await fs.writeJson(configPath, {
+        servers: {
+          dotcontext: { type: 'stdio', command: 'npx', args: ['-y', '@dotcontext/mcp@latest'] },
+          'other-server': { type: 'stdio', command: 'other', args: [] },
+        },
+        inputs: [{ id: 'keep-me' }],
+      });
+
+      await service.runUninstall({
+        tool: 'vscode',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      const config = await fs.readJson(configPath);
+      expect(config.servers.dotcontext).toBeUndefined();
+      expect(config.servers['other-server']).toEqual({ type: 'stdio', command: 'other', args: [] });
+      expect(config.inputs).toEqual([{ id: 'keep-me' }]);
+    });
+
+    it('removes only the matching JetBrains server from servers array', async () => {
+      const configPath = path.join(tempDir, '.jb-mcp.json');
+      await fs.writeJson(configPath, {
+        servers: [
+          { name: 'other-server', command: 'other', args: [] },
+          { name: 'dotcontext', command: 'npx', args: ['-y', '@dotcontext/mcp@latest'] },
+        ],
+        project: 'keep-me',
+      });
+
+      await service.runUninstall({
+        tool: 'jetbrains',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      const config = await fs.readJson(configPath);
+      expect(config.servers).toEqual([
+        { name: 'other-server', command: 'other', args: [] },
+      ]);
+      expect(config.project).toBe('keep-me');
+    });
+
+    it('deletes Continue standalone dotcontext config file', async () => {
+      const configPath = path.join(tempDir, '.continue', 'mcpServers', 'dotcontext.json');
+      await fs.ensureDir(path.dirname(configPath));
+      await fs.writeJson(configPath, {
+        command: 'npx',
+        args: ['-y', '@dotcontext/mcp@latest'],
+        env: {},
+      });
+
+      const result = await service.runUninstall({
+        tool: 'continue',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      expect(result.filesCreated).toBe(1);
+      expect(result.uninstallations[0].action).toBe('deleted');
+      expect(await fs.pathExists(configPath)).toBe(false);
+    });
+
+    it('removes only dotcontext Codex TOML tables and preserves other TOML content', async () => {
+      const configPath = path.join(tempDir, '.codex', 'config.toml');
+      await fs.ensureDir(path.dirname(configPath));
+      await fs.writeFile(configPath, [
+        'model = "gpt-5"',
+        '',
+        '[mcp_servers.other]',
+        'command = "other"',
+        'args = []',
+        '',
+        '[mcp_servers.dotcontext]',
+        'command = "npx"',
+        'args = ["-y", "@dotcontext/mcp@latest"]',
+        '',
+        '[mcp_servers.dotcontext.env]',
+        'DOTCONTEXT_TEST = "1"',
+        '',
+        '[profiles.default]',
+        'model = "gpt-5"',
+        '',
+      ].join('\n'), 'utf-8');
+
+      const result = await service.runUninstall({
+        tool: 'codex',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      expect(result.filesCreated).toBe(1);
+
+      const config = await fs.readFile(configPath, 'utf-8');
+      expect(config).toContain('model = "gpt-5"');
+      expect(config).toContain('[mcp_servers.other]');
+      expect(config).toContain('command = "other"');
+      expect(config).toContain('[profiles.default]');
+      expect(config).not.toContain('[mcp_servers.dotcontext]');
+      expect(config).not.toContain('[mcp_servers.dotcontext.env]');
+      expect(config).not.toContain('DOTCONTEXT_TEST = "1"');
+    });
+
+    it('does not modify files during dry-run uninstall', async () => {
+      const configPath = path.join(tempDir, '.mcp.json');
+      const originalConfig = {
+        mcpServers: {
+          dotcontext: { command: 'npx', args: ['-y', '@dotcontext/mcp@latest'] },
+          'other-server': { command: 'other', args: [] },
+        },
+      };
+      await fs.writeJson(configPath, originalConfig);
+
+      const result = await service.runUninstall({
+        tool: 'claude',
+        global: false,
+        repoPath: tempDir,
+        dryRun: true,
+      });
+
+      expect(result.filesCreated).toBe(1);
+      expect(result.uninstallations[0]).toEqual(expect.objectContaining({
+        action: 'updated',
+        dryRun: true,
+      }));
+      expect(await fs.readJson(configPath)).toEqual(originalConfig);
+    });
+
+    it('skips when dotcontext is not configured', async () => {
+      const configPath = path.join(tempDir, '.mcp.json');
+      await fs.writeJson(configPath, {
+        mcpServers: {
+          'other-server': { command: 'other', args: [] },
+        },
+      });
+
+      const result = await service.runUninstall({
+        tool: 'claude',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      expect(result.filesCreated).toBe(0);
+      expect(result.filesSkipped).toBe(1);
+      expect(result.uninstallations[0].action).toBe('skipped');
+      expect(await fs.readJson(configPath)).toEqual({
+        mcpServers: {
+          'other-server': { command: 'other', args: [] },
+        },
+      });
+    });
+
+    it('accepts gemini-cli alias for Gemini MCP uninstall', async () => {
+      const configPath = path.join(tempDir, '.gemini', 'settings.json');
+      await fs.ensureDir(path.dirname(configPath));
+      await fs.writeJson(configPath, {
+        mcpServers: {
+          dotcontext: { command: 'npx', args: ['-y', '@dotcontext/mcp@latest'] },
+        },
+      });
+
+      const result = await service.runUninstall({
+        tool: 'gemini-cli',
+        global: false,
+        repoPath: tempDir,
+      });
+
+      expect(result.uninstallations[0]).toEqual(expect.objectContaining({
+        tool: 'gemini',
+        action: 'updated',
+      }));
     });
   });
 

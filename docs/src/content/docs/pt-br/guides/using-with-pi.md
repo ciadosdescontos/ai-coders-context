@@ -53,6 +53,16 @@ Config padrão em `.mcp.json`:
 
 Global: `~/.config/mcp/mcp.json`.
 
+## Desinstalar
+
+Remova a extensão Pi com o comando canônico:
+
+```bash
+pi uninstall @dotcontext/pi
+```
+
+O menu interativo **Integrações** da CLI também expõe **Desinstalar Extensão Pi** e pode oferecer limpeza do MCP do Pi por `dotcontext mcp:uninstall pi --local`.
+
 ## Próximos passos
 
 - [Usando dotcontext com Hooks](/pt-br/guides/using-with-hooks/)

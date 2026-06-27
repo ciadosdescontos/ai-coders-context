@@ -90,24 +90,3 @@ export const typography = {
   treeItem: (text: string): string => `${typography.treePipe()}${colors.secondary(text)}`,
   treeLastItem: (text: string): string => `${typography.treeCorner()}${text}`,
 } as const;
-
-// Inquirer prompt theme configuration
-// Compatible with @inquirer/core Theme interface
-export const promptTheme = {
-  prefix: {
-    idle: colors.accent(symbols.pointer),
-    done: colors.success(symbols.success),
-  },
-  style: {
-    answer: (text: string) => colors.primary(text),
-    message: (text: string, _status: string) => colors.primary(text),
-    error: (text: string) => colors.error(text),
-    defaultAnswer: (text: string) => colors.secondaryDim(text),
-    help: (text: string) => colors.secondaryDim(text),
-    highlight: (text: string) => colors.accent(text),
-    key: (text: string) => colors.accent(text),
-  },
-  icon: {
-    cursor: colors.accent(symbols.pointer),
-  },
-};

@@ -43,15 +43,15 @@ Rode a CLI **sem argumentos** para entrar em um menu guiado. A CLI primeiro dete
 
 | Estado detectado | O que você vê |
 | --- | --- |
-| Projeto **novo** (sem `.context/`) | Instalar MCP, reverse sync ou configurações |
+| Projeto **novo** (sem `.context/`) | Integrações, importação ou configurações |
 | Projeto **não preenchido** (scaffold existe, arquivos pendentes) | Lista de arquivos pendentes, depois o menu completo |
 | Projeto **atualizado** | Menu completo com estatísticas de sync |
 
 O menu completo oferece estas ações:
 
-- **Quick Sync** — exportação unificada de agents, skills e docs para suas ferramentas de IA, com customização de destino
-- **Reverse Sync** — import interativo dos diretórios de ferramentas de IA de volta para o `.context/`
-- **MCP Install** — setup interativo do servidor MCP
+- **Synchronize my context** — exportação unificada de agents, skills e docs para suas ferramentas de IA, com customização de destino
+- **Import my context** — import interativo dos diretórios de ferramentas de IA de volta para o `.context/`
+- **Integrações** — instala ou desinstala MCP, hooks e a extensão Pi
 - **Settings** — seleção de idioma
 - **View Pending** — lista os arquivos aguardando conteúdo (exibido quando o projeto está não preenchido)
 - **Exit**
@@ -150,9 +150,19 @@ dotcontext admin skill export --preset all
 dotcontext admin skill export --preset claude --force
 ```
 
-## Setup de MCP pela CLI
+## Setup de integrações pela CLI
 
-A CLI também é como você conecta o servidor MCP ao seu editor ou agente. São dois comandos distintos.
+A CLI também é como você conecta MCP, hooks de ciclo de vida e a extensão Pi ao seu editor ou agente. O submenu interativo **Integrações** oferece:
+
+- **Instalar MCP**
+- **Desinstalar MCP**
+- **Instalar Hooks**
+- **Desinstalar Hooks**
+- **Instalar Extensão Pi**
+- **Desinstalar Extensão Pi**
+- **Voltar**
+
+As ações de instalação e desinstalação usam os mesmos caminhos de comando documentados abaixo. `Desinstalar MCP` é roteado para `dotcontext mcp:uninstall`.
 
 ### Instalar a configuração do MCP
 
@@ -174,6 +184,27 @@ dotcontext mcp:install codex --with-hooks
 ```
 
 Opções: `[tool]` (omita para ser perguntado), `-g, --global` (padrão), `-l, --local`, `--dry-run`, `--with-hooks`, `--no-hooks`, `--hook-format json|toml` e `-v, --verbose`. Hooks são recomendados e opcionais para Claude Code, Codex CLI e Pi; eles instalam config local no projeto por padrão. Veja [Usando o dotcontext com MCP](/pt-br/guides/using-with-mcp/) para a lista completa de ferramentas suportadas e caminhos de configuração.
+
+### Desinstalar configuração MCP
+
+```bash
+dotcontext mcp:uninstall
+dotcontext mcp:uninstall pi --local
+dotcontext mcp:uninstall codex --dry-run
+```
+
+As opções espelham escopo e preview da instalação: `[tool]`, `-g, --global`, `-l, --local`, `--dry-run` e `-v, --verbose`.
+
+### Hooks e extensão Pi
+
+```bash
+dotcontext hook install
+dotcontext hook uninstall
+dotcontext hook install pi
+dotcontext hook uninstall pi
+```
+
+A orientação de instalação da extensão Pi usa `pi install npm:@dotcontext/pi`. A orientação de desinstalação da extensão Pi usa o comando canônico `pi uninstall @dotcontext/pi`.
 
 ### Rodar o servidor MCP
 

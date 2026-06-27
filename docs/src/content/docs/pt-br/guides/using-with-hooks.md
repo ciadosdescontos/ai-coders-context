@@ -132,9 +132,10 @@ O doctor do Codex verifica `.codex/hooks.json` ou `.codex/config.toml`, `[featur
 ```bash
 npx -y @dotcontext/cli@latest hook uninstall claude-code
 npx -y @dotcontext/cli@latest hook uninstall codex --format toml
+npx -y @dotcontext/cli@latest hook uninstall pi
 ```
 
-Use `--dry-run` para pré-visualizar remoções.
+Use `--dry-run` para pré-visualizar remoções. Para Pi, a desinstalação imprime a orientação de remoção da extensão com `pi uninstall @dotcontext/pi`.
 
 ## Combine com MCP
 

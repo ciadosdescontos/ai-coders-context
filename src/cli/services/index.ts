@@ -7,14 +7,20 @@
 export {
   MCPInstallService,
   buildMcpInstallToolChoices,
+  buildMcpUninstallToolChoices,
   resolveMcpInstallToolSelection,
+  resolveMcpUninstallToolSelection,
   type MCPInstallServiceDependencies,
   type MCPInstallOptions,
+  type MCPUninstallOptions,
   type MCPInstallResult,
+  type MCPUninstallResult,
   type MCPInstallation,
+  type MCPUninstallation,
   type MCPInstallToolChoice,
   type MCPInstallToolPrompt,
   type ResolveMcpInstallToolSelectionOptions,
+  type ResolveMcpUninstallToolSelectionOptions,
 } from './mcpInstallService';
 
 export {
