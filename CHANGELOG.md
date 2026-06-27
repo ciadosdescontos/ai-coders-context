@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added lightweight Bash trace classification for hook traces (`test`, `build`, `lint`, `inspection`, migration/destructive hints) without running extra commands.
 - Added the `mcp:install` recommended hooks flow, including `--with-hooks`, `--no-hooks`, Codex `--hook-format`, `/hooks` trust, non-blocking hook behavior, and Pi's no-duplicate MCP snippet behavior in combined installs.
 - Added an interactive **Integrations** submenu with Install/Uninstall MCP, Install/Uninstall Hooks, Install/Uninstall Pi Extension, and Back, wired to `mcp:install`, `mcp:uninstall`, and the hook install/uninstall service paths.
+- Added `mcp:uninstall [tool]` with global/local scope, dry-run previews, and safe removal of only dotcontext MCP entries.
 
 ### Fixed
 
@@ -32,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Defaulted hook install/uninstall to project-level config; pass `--global` to target home-directory hook config.
+- Replaced the interactive prompt runtime with `@clack/prompts` and removed direct Inquirer runtime dependencies.
+- Raised the supported Node.js engine requirement to `>=20.12.0`.
 - Renamed the interactive menu labels from Quick Sync to **Synchronize my context** and Reverse Sync to **Import my context**.
 - Aligned Pi extension uninstall guidance on `pi uninstall @dotcontext/pi` across CLI output and docs.
 - Anchored the Claude Code `PostToolUse` matcher to exact `Write`, `Edit`, and `Bash` events.
