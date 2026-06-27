@@ -155,12 +155,12 @@ import { HarnessExecutionService } from '@dotcontext/harness';
 import { AIContextMCPServer } from '@dotcontext/mcp';
 ```
 
-Como os três compartilham a mesma versão raiz, fixar um e casar os demais mantém as superfícies compatíveis.
+Como os cinco compartilham a mesma versão raiz, fixar um e casar os demais mantém as superfícies compatíveis.
 
 ## Como tudo se encaixa
 
 1. Um **operador** roda a CLI, ou um **cliente de IA** chama uma tool do MCP.
-2. O transporte (`cli` ou `mcp`) traduz a requisição em uma chamada ao **harness**.
+2. O transporte (`cli`, `mcp` ou `integrations`) traduz a requisição em uma chamada ao **harness**.
 3. O harness executa o trabalho através de seus **serviços de application** e **regras de domain**.
 4. O estado é persistido pelos **adapters** em `.context/`.
 5. Qualquer outro transporte que leia esse estado — agora ou depois — vê o mesmo registro durável.

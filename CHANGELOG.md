@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-27
+
 ### Added
 
 - Added `hook doctor [host] --json` with Codex diagnostics for hook config, TOML hooks feature flags, current dispatch commands, `.context/`, workflow state, recent traces, and trace append failures.
@@ -18,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Included the `integrations` and `pi` bundles in local release preparation so `.release/releases/<version>` matches the five-package build output.
 - Reduced host hook noise: Stop/session-end hooks now emit PREVC workflow guidance only when an active workflow exists.
 - Prevented Stop/session-end hook reentry loops across Claude Code, Codex, and Pi by silently continuing when host reentry flags are active.
 - Kept `hook dispatch` stdout machine-readable by skipping the global update check for hook dispatch commands.

@@ -1,9 +1,9 @@
 ---
 title: dotcontext
-description: dotcontext is a harness for your harness — the contextual layer that keeps your work going no matter which AI tool you use, with shared context, PREVC workflow, sensors, policies, task contracts, replay, and MCP/CLI surfaces.
+description: dotcontext is a harness for your harness — the contextual layer that keeps your work going no matter which AI tool you use, with shared context, PREVC workflow, sensors, policies, task contracts, replay, and MCP/CLI/hook surfaces.
 template: splash
 hero:
-  tagline: A harness for your harness — the contextual layer that keeps your work going no matter which AI tool you switch to. Shared context, workflow, policies, sensors, contracts, and replayable history, across MCP and CLI.
+  tagline: A harness for your harness — the contextual layer that keeps your work going no matter which AI tool you switch to. Shared context, workflow, policies, sensors, contracts, and replayable history, across MCP, CLI, and hooks.
   image:
     file: ../../../assets/logo.svg
   actions:
@@ -26,10 +26,12 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 **dotcontext is a harness for your harness.** We provide the necessary contextual layer to keep the work going no matter which AI tool you switch to — shared project context, workflow structure, policies, sensors, task contracts, replayable execution history, and MCP access, all in one system. The goal is not only to give a model more context — it's to make agent execution **legible, constrained, reusable, and auditable**.
 
-The repository is organized around one runtime and three package surfaces:
+The repository is organized around one runtime with CLI, MCP, and host-integration surfaces:
 
 ```text
 cli -> harness <- mcp
+       ^
+       integrations
 ```
 
 <CardGrid stagger>

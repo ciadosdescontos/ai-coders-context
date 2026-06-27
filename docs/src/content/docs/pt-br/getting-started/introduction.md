@@ -1,6 +1,6 @@
 ---
 title: Introdução
-description: O que é o dotcontext, o problema que ele resolve e como as superfícies cli, harness e mcp se encaixam.
+description: O que é o dotcontext, o problema que ele resolve e como as superfícies cli, harness, mcp e integrações se encaixam.
 sidebar:
   order: 1
 ---
@@ -30,27 +30,32 @@ O dotcontext transforma esse contexto espalhado e descartável em uma única fon
 
 ## A forma: cli -> harness <- mcp
 
-O dotcontext é construído em torno de um runtime central — o **harness** — com duas superfícies envolvendo-o:
+O dotcontext é construído em torno de um runtime central — o **harness** — com superfícies de operador, protocolo e integrações de host envolvendo-o:
 
 ```text
 cli -> harness <- mcp
+       ^
+       integrations
 ```
 
-O harness contém todo o comportamento real. A CLI e o MCP são fronteiras finas que operadores e ferramentas de IA usam para alcançá-lo.
+O harness contém todo o comportamento real. A CLI, o MCP e as integrações de host são fronteiras finas que operadores, ferramentas de IA e hooks de ciclo de vida usam para alcançá-lo.
 
 | Superfície | Pacote | Quem usa | O que faz |
 | --- | --- | --- | --- |
-| **harness** | `@dotcontext/harness` | importado pelas outras duas | O runtime reutilizável: estado do workflow PREVC, sessions, sensors, policies, task contracts, replay e datasets. |
+| **harness** | `@dotcontext/harness` | importado pelas outras superfícies | O runtime reutilizável: estado do workflow PREVC, sessions, sensors, policies, task contracts, replay e datasets. |
 | **cli** | `@dotcontext/cli` | operadores (você, no terminal) | Sync e admin: exportar/importar rules, agents e skills entre `.context/` e os diretórios das ferramentas de IA, instalar o servidor MCP, rodar reports e gerenciar o estado do workflow. |
 | **mcp** | `@dotcontext/mcp` | ferramentas de IA (Claude Code, Cursor, etc.) | O transporte Model Context Protocol: expõe o comportamento do harness como tools e resources MCP, além de um instalador para clients suportados. |
+| **integrations** | `@dotcontext/integrations`, `@dotcontext/pi` | hooks e extensões de host | Adapters de ciclo de vida para Claude Code, Codex CLI e Pi que fazem bootstrap de contexto, registram traces e renderizam lembretes de workflow. |
 
-### As três superfícies de pacote
+### As cinco superfícies de pacote
 
-O dotcontext é distribuído como três pacotes npm publicáveis de forma independente que compartilham uma única versão:
+O dotcontext é distribuído como cinco pacotes npm publicáveis de forma independente que compartilham uma única versão:
 
 - **`@dotcontext/harness`** — o runtime reutilizável. Regras de domínio, roteamento do workflow, estado de session e runtime, sensors, policies e contracts. Importe-o se você está construindo em cima do dotcontext.
 - **`@dotcontext/cli`** — a linha de comando voltada ao operador. É o binário `dotcontext` que você roda para sincronizar artefatos e configurar ferramentas.
 - **`@dotcontext/mcp`** — o adaptador de transporte MCP e o instalador. É a isso que suas ferramentas de IA se conectam.
+- **`@dotcontext/integrations`** — adapters de hooks de host e mappers de eventos para Claude Code, Codex CLI e Pi.
+- **`@dotcontext/pi`** — a extensão npm do Pi para hooks in-process.
 
 :::note
 A CLI standalone é **focada em sync e admin**. Criação de contexto, fills gerados por IA e scaffolding de plano são **MCP-first** — rodam através do servidor MCP e das tools com Claude, não como comandos diretos da CLI.

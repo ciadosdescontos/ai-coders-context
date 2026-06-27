@@ -46,7 +46,7 @@ Veja o que cada um faz e por que importa.
 
 ### `npm run build`
 
-Compila os fontes TypeScript para `dist/` — `dist/cli/`, `dist/harness/`, `dist/mcp/` e `dist/shared/`, além das definições de tipo `.d.ts`. É o sinal mais rápido: um build limpo significa que os tipos batem e os imports entre fronteiras resolvem.
+Compila os fontes TypeScript para `dist/` — `dist/cli/`, `dist/harness/`, `dist/mcp/`, `dist/integrations/` e `dist/shared/`, além das definições de tipo `.d.ts`. É o sinal mais rápido: um build limpo significa que os tipos batem e os imports entre fronteiras resolvem.
 
 ### `npm test -- --runInBand`
 
@@ -58,9 +58,9 @@ Os testes ficam colocados junto do código que cobrem, em pastas `__tests__/`, e
 
 ### `npm run build:packages`
 
-Faz o build dos três bundles de pacote isolados em `.release/packages/{cli,harness,mcp}` via `scripts/build-package-bundles.js`. Esta etapa é o que prova que as fronteiras dos pacotes realmente se sustentam:
+Faz o build dos cinco bundles de pacote isolados em `.release/packages/{cli,harness,mcp,integrations,pi}` via `scripts/build-package-bundles.js`. Esta etapa é o que prova que as fronteiras dos pacotes realmente se sustentam:
 
-- Copia o `dist/` para a raiz de cada pacote.
+- Copia o `dist/` para as raízes dos pacotes compilados e o source da extensão Pi para a raiz do pacote Pi.
 - Escreve um manifesto `package.json` específico para cada surface — dependências filtradas, `exports` e entradas `bin`.
 - Copia arquivos compartilhados (`LICENSE`, `README.md`).
 - Gera os shims de bin para os executáveis (`dotcontext`, `dotcontext-mcp`).
@@ -70,8 +70,8 @@ Faz o build dos três bundles de pacote isolados em `.release/packages/{cli,harn
 
 Roda `scripts/smoke-package-bundles.js` para validar os bundles que você acabou de gerar. É um smoke test estrutural, não de runtime, e verifica:
 
-- Que o nome de cada manifesto bate com o escopo esperado (`@dotcontext/cli`, `@dotcontext/harness`, `@dotcontext/mcp`) e que a versão bate com a raiz.
-- Que o entry principal existe (`dist/cli/index.js`, `dist/harness/index.js`, `dist/mcp/index.js`) e que os arquivos de tipo `.d.ts` também existem.
+- Que o nome de cada manifesto bate com o escopo esperado (`@dotcontext/cli`, `@dotcontext/harness`, `@dotcontext/mcp`, `@dotcontext/integrations`, `@dotcontext/pi`) e que a versão bate com a raiz.
+- Que o entry principal existe para os pacotes compilados (`dist/cli/index.js`, `dist/harness/index.js`, `dist/mcp/index.js`, `dist/integrations/index.js`) e que os arquivos de tipo `.d.ts` também existem; o entry da extensão Pi existe em `extension/index.ts`.
 - Que os `exports` esperados estão presentes em cada index compilado.
 - Que as entradas `bin` e os shims locais existem para CLI e MCP.
 - Que **nenhuma pasta legada `dist/services/`** é publicada — isso reforça a arquitetura (comportamento de domínio não pode vazar para as surfaces de transporte).
@@ -81,17 +81,19 @@ Roda `scripts/smoke-package-bundles.js` para validar os bundles que você acabou
 A verificação de "nenhum `dist/services/`" é intencional. Se um smoke test de pacote falhar nela, provavelmente você moveu comportamento de domínio para `cli` ou `mcp` em vez de para o `harness`. Veja a [Arquitetura](/pt-br/about/architecture/) para as regras de fronteira.
 :::
 
-## Os três pacotes
+## Os cinco pacotes
 
-O monorepo publica três pacotes independentes a partir de uma única versão compartilhada. Entender qual surface é dona de quê mantém sua mudança no lugar certo.
+O monorepo publica cinco pacotes independentes a partir de uma única versão compartilhada. Entender qual surface é dona de quê mantém sua mudança no lugar certo.
 
 | Pacote | Papel | Bin |
 | --- | --- | --- |
 | `@dotcontext/cli` | Sync, import/export, setup de MCP, relatórios e workflows admin voltados ao operador. | `dotcontext` |
 | `@dotcontext/harness` | Runtime reutilizável: regras de domínio, sessions, policies, sensors, contracts, replay, estado de workflow. | — |
 | `@dotcontext/mcp` | Adaptador de transporte do Model Context Protocol e instalador para ferramentas de IA. | `dotcontext-mcp` |
+| `@dotcontext/integrations` | Adaptadores de hooks de host e mappers de eventos para Claude Code, Codex CLI e Pi. | — |
+| `@dotcontext/pi` | Extensão npm do Pi para hooks in-process. | — |
 
-Os três são versionados juntos para permanecerem compatíveis. Para o detalhe completo de exports e packaging, veja [Packaging & versionamento](/pt-br/reference/configuration/).
+Os cinco são versionados juntos para permanecerem compatíveis. Para o detalhe completo de exports e packaging, veja [Packaging & versionamento](/pt-br/reference/configuration/).
 
 :::note
 O `package.json` da raiz expõe apenas o bin `dotcontext`. O binário `dotcontext-mcp` aparece no manifesto `.release/packages/mcp/` produzido pelo `build:packages` — a CLI raiz inicia o servidor com `dotcontext mcp`, e não com um binário separado.
@@ -144,6 +146,6 @@ Abra seu pull request contra a `main` no [GitHub](https://github.com/vinilana/do
 ## Próximos passos
 
 - [Arquitetura](/pt-br/about/architecture/) — as fronteiras que sua mudança precisa respeitar.
-- [Packaging & versionamento](/pt-br/reference/configuration/) — como os três pacotes são construídos e publicados.
+- [Packaging & versionamento](/pt-br/reference/configuration/) — como os cinco pacotes são construídos e publicados.
 - [Comandos da CLI](/pt-br/reference/cli-commands/) — a surface de operador que você pode estar estendendo.
 - [Tools MCP](/pt-br/reference/mcp-tools/) — as actions de tool expostas aos clientes de IA.

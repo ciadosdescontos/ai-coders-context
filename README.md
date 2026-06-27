@@ -18,7 +18,7 @@ Dotcontext is three things at once:
 
 - a `.context/` convention for durable project knowledge
 - a harness runtime that governs how agents execute work
-- CLI and MCP surfaces that expose the same runtime to humans and AI tools
+- CLI, MCP, and host integration surfaces that expose the same runtime to humans, AI tools, and lifecycle hooks
 
 The repository is organized around one runtime and five package surfaces:
 
@@ -640,11 +640,11 @@ The package build prepares local bundles in `.release/packages/cli`, `.release/p
 
 ## Documentation
 
-📖 **Full documentation site** (bilingual EN / PT-BR), built with Astro + Starlight, lives in [`docs/`](./docs/). Run it locally with `cd docs && npm install && npm run dev`, or build the static site with `npm run build`. It covers installation, a quickstart, all concepts (the `.context` convention, the harness runtime, PREVC, sensors, policies, task contracts, replay), guides, and a full MCP/CLI reference.
+📖 **Full documentation site** (bilingual EN / PT-BR), built with Astro + Starlight, lives in [`docs/`](./docs/). Run it locally with `cd docs && npm install && npm run dev`, or build the static site with `npm run build`. It covers installation, a quickstart, all concepts (the `.context` convention, the harness runtime, PREVC, sensors, policies, task contracts, replay), guides, and full MCP/CLI/hook references.
 
 Other references in this repo:
 
-- [Documentation site](https://dotcontext.dev) — user guide, concepts, and MCP/CLI reference ([`docs/`](./docs/) source)
+- [Documentation site](https://dotcontext.dev) — user guide, concepts, and MCP/CLI/hook reference ([`docs/`](./docs/) source)
 - [Architecture](./ARCHITECTURE.md) - harness architecture and package boundaries
 - [Contributing](./CONTRIBUTING.md) - contributor workflow
 - [Changelog](./CHANGELOG.md) - release-facing changes

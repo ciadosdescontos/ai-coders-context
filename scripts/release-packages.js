@@ -11,6 +11,7 @@ const bundlesRoot = path.join(releaseRoot, 'packages');
 const releasesRoot = path.join(releaseRoot, 'releases');
 const rootPackagePath = path.join(repoRoot, 'package.json');
 const rootPackage = JSON.parse(fs.readFileSync(rootPackagePath, 'utf8'));
+const releasePackageSlugs = ['cli', 'harness', 'mcp', 'integrations', 'pi'];
 
 function run(command, args) {
   execFileSync(command, args, {
@@ -66,7 +67,7 @@ function buildRelease(version) {
   fs.rmSync(releaseDir, { recursive: true, force: true });
   fs.mkdirSync(releaseDir, { recursive: true });
 
-  for (const slug of ['cli', 'harness', 'mcp']) {
+  for (const slug of releasePackageSlugs) {
     const sourceDir = path.join(bundlesRoot, slug);
     const targetDir = path.join(releaseDir, slug);
     assert(fs.existsSync(sourceDir), `Missing bundle: ${slug}`);
@@ -78,7 +79,7 @@ function buildRelease(version) {
     version,
     rootVersion: rootPackage.version,
     createdAt: new Date().toISOString(),
-    packages: ['cli', 'harness', 'mcp'].map((slug) => ({
+    packages: releasePackageSlugs.map((slug) => ({
       slug,
       path: `./${slug}`,
     })),

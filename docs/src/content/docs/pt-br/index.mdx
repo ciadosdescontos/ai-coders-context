@@ -1,9 +1,9 @@
 ---
 title: dotcontext
-description: o dotcontext é um harness para o seu harness — a camada de contexto que mantém seu trabalho fluindo independente da ferramenta de IA que você usa, com contexto compartilhado, workflow PREVC, sensores, políticas, contratos de tarefa, replay e superfícies MCP/CLI.
+description: o dotcontext é um harness para o seu harness — a camada de contexto que mantém seu trabalho fluindo independente da ferramenta de IA que você usa, com contexto compartilhado, workflow PREVC, sensores, políticas, contratos de tarefa, replay e superfícies MCP/CLI/hooks.
 template: splash
 hero:
-  tagline: Um harness para o seu harness — a camada de contexto que mantém seu trabalho fluindo, não importa para qual ferramenta de IA você troque. Contexto compartilhado, workflow, políticas, sensores, contratos e histórico reproduzível, via MCP e CLI.
+  tagline: Um harness para o seu harness — a camada de contexto que mantém seu trabalho fluindo, não importa para qual ferramenta de IA você troque. Contexto compartilhado, workflow, políticas, sensores, contratos e histórico reproduzível, via MCP, CLI e hooks.
   image:
     file: ../../../assets/logo.svg
   actions:
@@ -26,10 +26,12 @@ import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 O **dotcontext é um harness para o seu harness.** Fornecemos a camada de contexto necessária para manter o trabalho fluindo, não importa para qual ferramenta de IA você troque — contexto de projeto compartilhado, estrutura de workflow, políticas, sensores, contratos de tarefa, histórico de execução reproduzível e acesso via MCP, tudo em um único sistema. O objetivo não é só dar mais contexto ao modelo — é tornar a execução do agente **legível, restrita, reutilizável e auditável**.
 
-O repositório se organiza em torno de um runtime e três superfícies de pacote:
+O repositório se organiza em torno de um runtime com superfícies CLI, MCP e integrações de host:
 
 ```text
 cli -> harness <- mcp
+       ^
+       integrations
 ```
 
 <CardGrid stagger>
