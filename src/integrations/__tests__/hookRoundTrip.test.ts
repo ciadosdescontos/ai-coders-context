@@ -6,6 +6,7 @@ import {
   mapClaudeCodeResponse,
   mapCodexEvent,
   mapCodexResponse,
+  mapHostHookResponse,
   mapPiEvent,
   mapPiResponse,
   normalizeToolEvent,
@@ -130,6 +131,29 @@ describe('hook mapper unit tests', () => {
       });
     });
 
+    it('emits Stop workflow guidance when a PREVC workflow is active', () => {
+      const output = mapClaudeCodeResponse(stopFixture, {
+        ok: true,
+        tool: 'workflow-guide',
+        source: 'claude-code',
+        result: {
+          kind: 'json',
+          data: {
+            workflow: { active: true },
+            excerpt: 'dotcontext workflow guide:\nWorkflow "feature-x" - phase V.',
+          },
+        },
+      });
+
+      expect(output).toEqual({
+        source: 'claude-code',
+        hookSpecificOutput: {
+          hookEventName: 'Stop',
+          additionalContext: expect.stringContaining('feature-x'),
+        },
+      });
+    });
+
     it('returns continue on harness errors', () => {
       const output = mapClaudeCodeResponse(sessionStartFixture, {
         ok: false,
@@ -140,6 +164,145 @@ describe('hook mapper unit tests', () => {
       expect(output).toEqual({
         source: 'claude-code',
         continue: true,
+      });
+    });
+
+    it('suppresses Stop guidance during reentry', () => {
+      const output = mapClaudeCodeResponse(
+        { ...stopFixture, stop_hook_active: true },
+        {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'claude-code',
+          result: {
+            kind: 'json',
+            data: {
+              workflow: { active: true },
+              excerpt: 'dotcontext workflow guide:\nWorkflow "feature-x" - phase V.',
+            },
+          },
+        }
+      );
+
+      expect(output).toEqual({
+        source: 'claude-code',
+        continue: true,
+      });
+    });
+  });
+
+  describe('mapCodexResponse', () => {
+    it('injects SessionStart additionalContext when scaffold exists', () => {
+      const output = mapCodexResponse(codexSessionStartFixture, {
+        ok: true,
+        tool: 'context',
+        source: 'codex',
+        result: {
+          kind: 'json',
+          data: {
+            initialized: true,
+            docs: true,
+            workflow: true,
+            harness: true,
+          },
+        },
+      });
+
+      expect(output.source).toBe('codex');
+      expect(output.hookSpecificOutput).toEqual({
+        hookEventName: 'SessionStart',
+        additionalContext: expect.stringContaining('scaffold ready (docs, workflow, harness)'),
+      });
+    });
+
+    it('suppresses Stop guidance during reentry', () => {
+      const output = mapCodexResponse(
+        { ...codexStopFixture, sessionEndActive: true },
+        {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'codex',
+          result: {
+            kind: 'json',
+            data: {
+              workflow: { active: true },
+              excerpt: 'dotcontext workflow guide:\nWorkflow "feature-x" - phase V.',
+            },
+          },
+        }
+      );
+
+      expect(output).toEqual({
+        source: 'codex',
+        continue: true,
+      });
+    });
+  });
+
+  describe('mapHostHookResponse', () => {
+    it.each([
+      ['skipped', { skipped: true, workflow: { active: true }, excerpt: 'guide text' }],
+      ['blank', { workflow: { active: true }, excerpt: '  \n  ' }],
+      ['inactive', { workflow: { active: false }, excerpt: 'No active PREVC workflow.' }],
+    ])('continues silently for %s Stop workflow-guide output', (_name, data) => {
+      const response: HarnessHookResponse = {
+        ok: true,
+        tool: 'workflow-guide',
+        source: 'codex',
+        result: {
+          kind: 'json',
+          data,
+        },
+      };
+
+      expect(mapHostHookResponse('Stop', response, { source: 'codex' })).toEqual({
+        source: 'codex',
+        continue: true,
+      });
+    });
+
+    it.each([
+      ['skipped', { skipped: true, workflow: { active: true }, excerpt: 'guide text' }],
+      ['blank', { workflow: { active: true }, excerpt: '  \n  ' }],
+      ['inactive', { workflow: { active: false }, excerpt: 'No active PREVC workflow.' }],
+    ])('keeps Claude, Codex, and Pi Stop renderers silent for %s guidance', (_name, data) => {
+      expect(
+        mapClaudeCodeResponse(stopFixture, {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'claude-code',
+          result: { kind: 'json', data },
+        })
+      ).toEqual({
+        source: 'claude-code',
+        continue: true,
+      });
+
+      expect(
+        mapCodexResponse(codexStopFixture, {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'codex',
+          result: { kind: 'json', data },
+        })
+      ).toEqual({
+        source: 'codex',
+        continue: true,
+      });
+
+      expect(
+        mapPiResponse(
+          { type: 'agent_end', cwd: '/tmp/repo', sessionId: 'pi-1' },
+          {
+            ok: true,
+            tool: 'workflow-guide',
+            source: 'pi-dev',
+            result: { kind: 'json', data },
+          }
+        )
+      ).toEqual({
+        source: 'pi-dev',
+        silent: true,
       });
     });
   });
@@ -192,6 +355,101 @@ describe('hook mapper unit tests', () => {
 
       expect(output.source).toBe('pi-dev');
       expect(output.silent).toBe(true);
+    });
+
+    it('notifies agent_end workflow guidance when a PREVC workflow is active', () => {
+      const output = mapPiResponse(
+        { type: 'agent_end', cwd: '/tmp/repo', sessionId: 'pi-1' },
+        {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'pi-dev',
+          result: {
+            kind: 'json',
+            data: {
+              workflow: { active: true },
+              excerpt: 'dotcontext workflow guide:\nWorkflow "feature-x" - phase E.',
+            },
+          },
+        }
+      );
+
+      expect(output).toEqual({
+        source: 'pi-dev',
+        notify: expect.stringContaining('feature-x'),
+      });
+    });
+
+    it('suppresses agent_end workflow guidance when workflow is inactive', () => {
+      const output = mapPiResponse(
+        { type: 'agent_end', cwd: '/tmp/repo', sessionId: 'pi-1' },
+        {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'pi-dev',
+          result: {
+            kind: 'json',
+            data: {
+              workflow: { active: false },
+              excerpt: 'dotcontext workflow guide:\nNo active PREVC workflow.',
+            },
+          },
+        }
+      );
+
+      expect(output).toEqual({
+        source: 'pi-dev',
+        silent: true,
+      });
+    });
+
+    it('suppresses agent_end workflow guidance during reentry', () => {
+      const output = mapPiResponse(
+        {
+          type: 'agent_end',
+          cwd: '/tmp/repo',
+          sessionId: 'pi-1',
+          agentEndActive: true,
+        },
+        {
+          ok: true,
+          tool: 'workflow-guide',
+          source: 'pi-dev',
+          result: {
+            kind: 'json',
+            data: {
+              workflow: { active: true },
+              excerpt: 'dotcontext workflow guide:\nWorkflow "feature-x" - phase V.',
+            },
+          },
+        }
+      );
+
+      expect(output).toEqual({
+        source: 'pi-dev',
+        silent: true,
+      });
+    });
+
+    it('counts workflow and harness as scaffold readiness on session_start', () => {
+      const output = mapPiResponse(
+        { type: 'session_start', cwd: '/tmp/repo', sessionId: 'pi-1' },
+        {
+          ok: true,
+          tool: 'context',
+          source: 'pi-dev',
+          result: {
+            kind: 'json',
+            data: {
+              initialized: true,
+              workflow: true,
+              harness: true,
+            },
+          },
+        }
+      );
+
+      expect(output.additionalContext).toContain('scaffold ready (workflow, harness)');
     });
   });
 });
@@ -276,6 +534,6 @@ describe('hook round-trip integrations', () => {
     });
     expect(harnessResponse.source).toBe('pi-dev');
     expect(hostOutput.source).toBe('pi-dev');
-    expect(hostOutput.additionalContext).toContain('no .context/');
+    expect(hostOutput.additionalContext).toContain('this repository does not have .context/ yet');
   });
 });

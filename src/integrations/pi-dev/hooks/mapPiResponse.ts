@@ -1,7 +1,12 @@
-import type { HarnessHookResponse } from '../../../harness';
+import {
+  extractHookReadinessSummary,
+  formatHookReadinessAdditionalContext,
+  type HarnessHookResponse,
+} from '../../../harness';
 
 import { extractHarnessSessionId } from '../../shared/extractHarnessSessionId';
 import { formatNavigationExcerpt } from '../../shared/formatNavigationExcerpt';
+import { isSessionEndReentry } from '../../shared/sessionEndReentry';
 
 import type { PiDevHookEvent } from './mapPiEvent';
 
@@ -26,12 +31,17 @@ function extractResultData(response: Extract<HarnessHookResponse, { ok: true }>)
 }
 
 function formatContextMessage(data: unknown): string {
+  const readiness = extractHookReadinessSummary(data);
+  if (readiness) {
+    return formatHookReadinessAdditionalContext(readiness, { source: 'pi-dev' });
+  }
+
   if (!isRecord(data) || !data.initialized) {
-    return 'dotcontext: no .context/ — run npx @dotcontext/mcp install and initialize context.';
+    return 'dotcontext: this repository does not have .context/ yet.\nNext step: configure MCP and ask the agent to run context init in this project.';
   }
 
   const enabled: string[] = [];
-  for (const key of ['docs', 'agents', 'skills', 'plans'] as const) {
+  for (const key of ['docs', 'agents', 'skills', 'plans', 'workflow', 'harness'] as const) {
     if (data[key]) {
       enabled.push(key);
     }
@@ -49,8 +59,14 @@ function formatWorkflowGuideNotify(data: unknown): string | undefined {
     return undefined;
   }
 
-  if (typeof data.excerpt === 'string' && data.excerpt.length > 0) {
-    return data.excerpt;
+  const workflow = data.workflow;
+  if (data.skipped === true || (isRecord(workflow) && workflow.active === false)) {
+    return undefined;
+  }
+
+  if (typeof data.excerpt === 'string') {
+    const excerpt = data.excerpt.trim();
+    return excerpt.length > 0 ? excerpt : undefined;
   }
 
   return undefined;
@@ -86,6 +102,10 @@ export function mapPiResponse(
   }
 
   if (event.type === 'tool_execution_end') {
+    return { source: 'pi-dev', silent: true };
+  }
+
+  if (event.type === 'agent_end' && isSessionEndReentry(event)) {
     return { source: 'pi-dev', silent: true };
   }
 

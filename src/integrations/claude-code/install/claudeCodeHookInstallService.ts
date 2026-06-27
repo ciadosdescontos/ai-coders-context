@@ -29,12 +29,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function resolveConfigPath(options: ClaudeCodeHookInstallOptions): string {
-  if (options.global === false) {
-    const repoPath = path.resolve(options.repoPath ?? process.cwd());
-    return path.join(repoPath, '.claude', 'settings.json');
+  if (options.global === true) {
+    return path.join(os.homedir(), '.claude', 'settings.json');
   }
 
-  return path.join(os.homedir(), '.claude', 'settings.json');
+  const repoPath = path.resolve(options.repoPath ?? process.cwd());
+  return path.join(repoPath, '.claude', 'settings.json');
 }
 
 function entryUsesDotcontextCommand(entry: ClaudeCodeHookMatcherEntry): boolean {

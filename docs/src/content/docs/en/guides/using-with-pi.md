@@ -31,7 +31,7 @@ pi install npm:pi-mcp-adapter
 Or use the hook installer, which prints Pi instructions and can write a starter `.mcp.json`:
 
 ```bash
-npx -y @dotcontext/cli@latest hook install pi --local
+npx -y @dotcontext/cli@latest hook install pi
 pi install npm:@dotcontext/pi
 pi install npm:pi-mcp-adapter
 ```
@@ -53,6 +53,8 @@ The default export registers handlers through Pi's `ExtensionAPI`:
 | `agent_end` | `workflow-guide` | Optional UI notification with PREVC next steps, skills, and gate hints |
 
 When `.context/` is missing, `session_start` injects a one-line hint to initialize context through MCP.
+
+The `agent_end` handler is non-blocking and quiet unless an active PREVC workflow exists. If Pi marks a session-end callback as already active or reentrant, dotcontext suppresses the notification so lifecycle feedback cannot trigger a loop.
 
 ## MCP coexistence
 

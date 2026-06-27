@@ -143,7 +143,7 @@ export class HookInstallService {
 
     const {
       host,
-      global: isGlobal = true,
+      global: isGlobal = false,
       dryRun = false,
       verbose = false,
       format = 'json',
@@ -202,7 +202,7 @@ export class HookInstallService {
 
     const {
       host,
-      global: isGlobal = true,
+      global: isGlobal = false,
       dryRun = false,
       verbose = false,
       format = 'json',

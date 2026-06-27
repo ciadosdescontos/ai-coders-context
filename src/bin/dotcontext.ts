@@ -22,6 +22,7 @@ import {
   HookInstallService,
   resolveHookInstallHostSelection,
   runHookDispatch,
+  HookDoctorService,
   SyncService,
   ImportRulesService,
   ImportAgentsService,
@@ -121,7 +122,14 @@ function scheduleVersionCheck(force: boolean = false): Promise<void> {
   return versionCheckPromise;
 }
 
-program.hook('preAction', () => {
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  if (
+    actionCommand.parent?.name() === 'hook'
+    && (actionCommand.name() === 'dispatch' || actionCommand.name() === 'doctor')
+  ) {
+    return;
+  }
+
   void scheduleVersionCheck();
 });
 
@@ -309,7 +317,7 @@ const hookCommand = program
 hookCommand
   .command('install [host]')
   .description(t('commands.hookInstall.description'))
-  .option('-g, --global', t('commands.hookInstall.options.global'), true)
+  .option('-g, --global', t('commands.hookInstall.options.global'))
   .option('-l, --local', t('commands.hookInstall.options.local'))
   .option('--dry-run', t('commands.hookInstall.options.dryRun'))
   .option('--format <format>', t('commands.hookInstall.options.format'), 'json')
@@ -370,9 +378,35 @@ hookCommand
   });
 
 hookCommand
+  .command('doctor [host]')
+  .description('Diagnose dotcontext hook setup')
+  .option('--repo-path <path>', 'Repository path override')
+  .option('--json', 'Output machine-readable JSON')
+  .action(async (host: string | undefined, options: any) => {
+    try {
+      const service = new HookDoctorService({ ui, t, version: VERSION });
+      const result = await service.run({
+        host,
+        repoPath: options.repoPath,
+      });
+
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(service.formatHuman(result));
+      }
+
+      process.exit(result.exitCode);
+    } catch (error) {
+      ui.displayError('Hook doctor failed', error as Error);
+      process.exit(1);
+    }
+  });
+
+hookCommand
   .command('uninstall [host]')
   .description(t('commands.hookUninstall.description'))
-  .option('-g, --global', t('commands.hookInstall.options.global'), true)
+  .option('-g, --global', t('commands.hookInstall.options.global'))
   .option('-l, --local', t('commands.hookInstall.options.local'))
   .option('--dry-run', t('commands.hookInstall.options.dryRun'))
   .option('--format <format>', t('commands.hookInstall.options.format'), 'json')

@@ -22,7 +22,7 @@ pi install npm:pi-mcp-adapter
 Ou via hook install (imprime instruções e pode escrever `.mcp.json`):
 
 ```bash
-npx -y @dotcontext/cli@latest hook install pi --local
+npx -y @dotcontext/cli@latest hook install pi
 ```
 
 ## O que a extensão faz
@@ -32,6 +32,8 @@ npx -y @dotcontext/cli@latest hook install pi --local
 | `session_start` | `context` → `check` | Injeta bootstrap ou dica |
 | `tool_execution_end` | `harness` → `appendTrace` | Trace silencioso |
 | `agent_end` | `workflow-guide` | Notificação com próximos passos, skills e dicas de gate PREVC |
+
+`agent_end` fica silencioso sem workflow PREVC ativo, e chamadas marcadas como reentrantes são ignoradas para evitar loops de notificação.
 
 ## MCP
 

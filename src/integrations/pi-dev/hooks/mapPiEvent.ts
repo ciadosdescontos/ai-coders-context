@@ -1,4 +1,7 @@
-import type { HarnessHookEvent } from '../../../harness';
+import {
+  buildHookTraceData,
+  type HarnessHookEvent,
+} from '../../../harness';
 
 export interface PiSessionStartEvent {
   type: 'session_start';
@@ -18,6 +21,11 @@ export interface PiAgentEndEvent {
   type: 'agent_end';
   cwd?: string;
   sessionId?: string;
+  agentEndActive?: boolean | string | number;
+  sessionEndActive?: boolean | string | number;
+  stopHookActive?: boolean | string | number;
+  reentry?: boolean | string | number;
+  reentrant?: boolean | string | number;
 }
 
 export interface PiHarnessCreateSessionEvent {
@@ -99,7 +107,7 @@ export function mapPiEvent(
           event: 'tool.use',
           message: event.toolName,
           data: {
-            tool_input: event.toolInput,
+            ...buildHookTraceData(event.toolName, event.toolInput),
             host: 'pi-dev',
           },
         },

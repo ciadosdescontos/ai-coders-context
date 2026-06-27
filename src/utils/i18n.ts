@@ -361,8 +361,8 @@ const englishMessages = {
   // Hook command translations
   'commands.hook.description': 'Install and manage dotcontext host hooks',
   'commands.hookInstall.description': 'Install dotcontext hooks for Claude Code, Codex CLI, or Pi',
-  'commands.hookInstall.options.global': 'Install globally in home directory (default)',
-  'commands.hookInstall.options.local': 'Install locally in project directory',
+  'commands.hookInstall.options.global': 'Install globally in home directory',
+  'commands.hookInstall.options.local': 'Install locally in project directory (default)',
   'commands.hookInstall.options.dryRun': 'Preview changes without writing',
   'commands.hookInstall.options.verbose': 'Enable verbose output',
   'commands.hookInstall.options.format': 'Codex only: hooks.json (json) or config.toml inline (toml)',
@@ -935,8 +935,8 @@ const portugueseMessages: TranslationDictionary = {
   // Traduções dos comandos hook
   'commands.hook.description': 'Instalar e gerenciar hooks de host do dotcontext',
   'commands.hookInstall.description': 'Instalar hooks do dotcontext para Claude Code, Codex CLI ou Pi',
-  'commands.hookInstall.options.global': 'Instalar globalmente no diretório home (padrão)',
-  'commands.hookInstall.options.local': 'Instalar localmente no diretório do projeto',
+  'commands.hookInstall.options.global': 'Instalar globalmente no diretório home',
+  'commands.hookInstall.options.local': 'Instalar localmente no diretório do projeto (padrão)',
   'commands.hookInstall.options.dryRun': 'Visualizar mudanças sem escrever',
   'commands.hookInstall.options.verbose': 'Habilitar saída detalhada',
   'commands.hookInstall.options.format': 'Somente Codex: hooks.json (json) ou config.toml inline (toml)',

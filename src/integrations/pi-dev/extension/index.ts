@@ -58,6 +58,16 @@ function isInitialized(response: Awaited<ReturnType<ReturnType<typeof createAdap
     && Boolean((data as { initialized?: boolean }).initialized);
 }
 
+function readSessionEndReentryFields(event: Record<string, unknown>): Partial<PiDevHookEvent> {
+  return {
+    stopHookActive: event.stopHookActive ?? event.stop_hook_active,
+    sessionEndActive: event.sessionEndActive ?? event.session_end_active,
+    agentEndActive: event.agentEndActive ?? event.agent_end_active,
+    reentry: event.reentry,
+    reentrant: event.reentrant,
+  };
+}
+
 export default function dotcontextPiExtension(pi: ExtensionAPI): void {
   let harnessSessionId: string | undefined;
 
@@ -125,12 +135,13 @@ export default function dotcontextPiExtension(pi: ExtensionAPI): void {
     }
   });
 
-  pi.on('agent_end', async (_event, ctx) => {
+  pi.on('agent_end', async (event, ctx) => {
     const adapter = createAdapter(ctx.cwd);
     const agentEndEvent: PiDevHookEvent = {
       type: 'agent_end',
       cwd: ctx.cwd,
       sessionId: harnessSessionId,
+      ...readSessionEndReentryFields(event),
     };
     const response = await adapter.handle(agentEndEvent);
     const output = mapPiResponse(agentEndEvent, response);

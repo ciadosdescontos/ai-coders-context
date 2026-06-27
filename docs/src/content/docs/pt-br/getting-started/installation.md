@@ -115,18 +115,27 @@ npx -y @dotcontext/cli@latest hook install
 Exemplos:
 
 ```bash
-npx -y @dotcontext/cli@latest hook install claude-code --local --dry-run
-npx -y @dotcontext/cli@latest hook install codex --local --format toml
+npx -y @dotcontext/cli@latest hook install claude-code --dry-run
+npx -y @dotcontext/cli@latest hook install codex --format toml
+npx -y @dotcontext/cli@latest hook install claude-code --global
 ```
 
+Por padrão, a instalação de hooks escreve configuração no projeto atual. Use `--global` para escrever no diretório home.
+
 Após instalar hooks do Codex, rode `/hooks` no Codex e confie nos hooks do projeto quando solicitado.
+
+Para diagnosticar a configuração do Codex, rode:
+
+```bash
+npx -y @dotcontext/cli@latest hook doctor codex
+```
 
 ## Caminho 1c: extensão Pi
 
 Pi usa uma extensão npm in-process:
 
 ```bash
-npx -y @dotcontext/cli@latest hook install pi --local
+npx -y @dotcontext/cli@latest hook install pi
 pi install npm:@dotcontext/pi
 npx @dotcontext/mcp install pi --local
 pi install npm:pi-mcp-adapter
